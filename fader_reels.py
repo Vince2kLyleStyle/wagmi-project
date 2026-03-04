@@ -181,7 +181,11 @@ def upload_reel(cl: Client, video_path: str) -> str | None:
     """
     Upload a single Reel. Returns the media ID on success, None on failure.
     """
-    caption = captions.generate_caption()
+    # Use the same viral caption every time (the method) or randomize
+    if config.USE_SAME_CAPTION:
+        caption = config.VIRAL_CAPTION
+    else:
+        caption = captions.generate_caption()
     thumbnail = extract_random_thumbnail(video_path)
 
     kwargs = {
@@ -282,7 +286,8 @@ def main() -> None:
     """)
     print(f"  Account:    @{config.USERNAME}")
     print(f"  Daily cap:  {daily_cap} Reels")
-    print(f"  Batch size: {config.BATCH_SIZE}")
+    print(f"  Batch size: {config.BATCH_SIZE} every ~{config.INTER_BATCH_CENTER // 60}min")
+    print(f"  Caption:    {'SAME viral caption' if config.USE_SAME_CAPTION else 'randomized'}")
     print(f"  Video dir:  {config.VIDEO_DIR}")
     print(f"  Session:    {session_file}")
     print()

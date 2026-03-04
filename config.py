@@ -17,18 +17,32 @@ VIDEO_DIR = os.path.join(os.path.dirname(__file__), "tiktok_videos")
 # ─── Posting Limits ────────────────────────────────────────────────
 DAILY_MIN = 8          # minimum posts per day
 DAILY_MAX = 15         # hard cap per day
-BATCH_SIZE = 3         # videos per mini-batch (like old Fader)
+BATCH_SIZE = 3         # 2-3 videos per mini-batch (every ~20 min cycle)
+
+# ─── Caption ──────────────────────────────────────────────────────
+# THE viral caption — same on every single post (this is the method).
+# Change this to whatever viral caption is working for your niche.
+VIRAL_CAPTION = (
+    "Follow for more 🔥💯\n"
+    ".\n.\n.\n"
+    "#viral #fyp #foryou #explore #trending #reels #reelsinstagram"
+)
+
+# Set to False to use randomized captions instead (old behavior)
+USE_SAME_CAPTION = True
 
 # ─── Timing (seconds) ──────────────────────────────────────────────
-# Intra-batch delay (between videos inside one batch)
-INTRA_BATCH_MIN = 40
-INTRA_BATCH_MAX = 90
+# Intra-batch delay (between videos INSIDE one batch of 2-3)
+# Keep short — you're posting 2-3 back-to-back, then waiting ~20 min
+INTRA_BATCH_MIN = 20
+INTRA_BATCH_MAX = 60
 
-# Inter-batch delay (between batches) — Gaussian center + jitter
-INTER_BATCH_CENTER = 3600    # 60 min center
-INTER_BATCH_SPREAD = 1200    # ±20 min std-dev
-INTER_BATCH_FLOOR = 2700     # never less than 45 min
-INTER_BATCH_CEIL = 10800     # never more than 3 hours
+# Inter-batch delay — ~20 min between batches (the method)
+# Gaussian jitter so it's not exactly 20:00 every time
+INTER_BATCH_CENTER = 1200    # 20 min center
+INTER_BATCH_SPREAD = 180     # ±3 min std-dev
+INTER_BATCH_FLOOR = 900      # never less than 15 min
+INTER_BATCH_CEIL = 1500      # never more than 25 min
 
 # ─── Session Refresh ───────────────────────────────────────────────
 REFRESH_EVERY_N_POSTS = 25   # re-login every N uploads
