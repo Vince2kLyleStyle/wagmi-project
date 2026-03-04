@@ -1,12 +1,13 @@
 """
 Fader v2 — Human Simulation Module
-Performs realistic "human browsing" actions before/after posting
-to warm up the session and avoid looking robotic.
+Performs realistic browsing actions before/after posting
+to warm up the session and reduce detection risk.
+
+Verified against instagrapi 2.x API — only calls methods that actually exist.
 """
 
 import random
 import time
-import sys
 
 from instagrapi import Client
 
@@ -14,7 +15,7 @@ import config
 
 
 def _rand_sleep(lo: float, hi: float, label: str = ""):
-    """Sleep a random duration between lo and hi seconds, with countdown."""
+    """Sleep a random duration between lo and hi seconds."""
     duration = random.uniform(lo, hi)
     if label:
         print(f"  [{label}] pausing {duration:.0f}s ...", end="", flush=True)
@@ -25,8 +26,8 @@ def _rand_sleep(lo: float, hi: float, label: str = ""):
 
 def warmup_session(cl: Client) -> None:
     """
-    Warm-up phase: spend 30-60 min just browsing (no posting).
-    Views stories and likes feed posts to look like a real user.
+    Warm-up phase: browse for a while before posting.
+    Views stories and likes feed posts to generate normal-looking activity.
     """
     warmup_sec = random.randint(config.WARMUP_MIN_SEC, config.WARMUP_MAX_SEC)
     print(f"\n{'='*60}")
@@ -37,22 +38,19 @@ def warmup_session(cl: Client) -> None:
     actions_done = 0
 
     while time.time() < deadline:
-        action = random.choice(["story", "feed_like", "explore", "pause"])
+        action = random.choice(["story", "feed_like", "pause"])
 
         try:
             if action == "story":
                 _view_random_stories(cl, 1, 4)
             elif action == "feed_like":
                 _like_random_feed(cl, 1, 2)
-            elif action == "explore":
-                _browse_explore(cl)
             else:
                 _rand_sleep(15, 60, "idle scroll")
         except Exception as e:
             print(f"  [warmup] non-critical error: {e}")
 
         actions_done += 1
-        # Random pause between warm-up actions
         _rand_sleep(20, 90)
 
     print(f"  Warm-up complete — {actions_done} actions performed.\n")
@@ -62,11 +60,9 @@ def pre_upload_actions(cl: Client) -> None:
     """Simulate human browsing right before an upload."""
     print("  [pre-upload] simulating human activity...")
 
-    # View some stories
     story_count = random.randint(config.PRE_STORIES_MIN, config.PRE_STORIES_MAX)
     _view_random_stories(cl, story_count // 2, story_count)
 
-    # Like some feed posts
     like_count = random.randint(config.PRE_LIKES_MIN, config.PRE_LIKES_MAX)
     _like_random_feed(cl, like_count // 2, like_count)
 
@@ -84,16 +80,22 @@ def post_upload_actions(cl: Client) -> None:
 # ─── Internal Helpers ───────────────────────────────────────────────
 
 def _view_random_stories(cl: Client, lo: int, hi: int) -> None:
-    """View stories from random users in the timeline tray."""
+    """
+    View stories from random users in the timeline tray.
+
+    get_reels_tray_feed() returns a raw dict from Instagram's API.
+    The "tray" key contains a list of reel dicts, each with a "user" dict
+    containing an "pk" field.
+    """
     try:
         count = random.randint(lo, max(lo, hi))
-        reels_tray = cl.get_reels_tray_feed()
+        tray_response = cl.get_reels_tray_feed()
 
-        if not reels_tray or not hasattr(reels_tray, '__iter__'):
-            print("  [stories] no story tray available")
+        if not isinstance(tray_response, dict):
+            print("  [stories] unexpected tray response type")
             return
 
-        tray_list = list(reels_tray)
+        tray_list = tray_response.get("tray", [])
         if not tray_list:
             print("  [stories] empty tray")
             return
@@ -101,19 +103,19 @@ def _view_random_stories(cl: Client, lo: int, hi: int) -> None:
         to_view = random.sample(tray_list, k=min(count, len(tray_list)))
         for reel in to_view:
             try:
-                user_id = None
-                if hasattr(reel, 'user'):
-                    user_id = reel.user.pk if hasattr(reel.user, 'pk') else None
-                elif hasattr(reel, 'id'):
-                    user_id = reel.id
+                # Each reel in the tray is a dict with "user" -> "pk"
+                user_info = reel.get("user", {})
+                user_id = user_info.get("pk")
 
-                if user_id:
-                    stories = cl.user_stories(user_id)
-                    if stories:
-                        # Mark as seen by viewing
-                        story = random.choice(stories)
-                        cl.story_seen([story.pk])
-                        print(f"    viewed story from user {user_id}")
+                if not user_id:
+                    continue
+
+                stories = cl.user_stories(user_id)
+                if stories:
+                    story = random.choice(stories)
+                    # story_seen takes a list of story PKs
+                    cl.story_seen([story.pk])
+                    print(f"    viewed story from user {user_id}")
             except Exception:
                 pass
             _rand_sleep(2, 8)
@@ -122,21 +124,30 @@ def _view_random_stories(cl: Client, lo: int, hi: int) -> None:
 
 
 def _like_random_feed(cl: Client, lo: int, hi: int) -> None:
-    """Like random posts from the user's timeline feed."""
+    """
+    Like random posts from the user's timeline feed.
+
+    get_timeline_feed() returns a raw dict. The "feed_items" key contains
+    a list of dicts, each with a "media_or_ad" dict that has "pk" or "id".
+    """
     try:
         count = random.randint(lo, max(lo, hi))
-        # Get timeline feed medias
         feed = cl.get_timeline_feed()
 
-        if not feed or "feed_items" not in feed:
-            print("  [likes] no feed available")
+        if not isinstance(feed, dict):
+            print("  [likes] unexpected feed response type")
             return
 
-        items = [
-            item.get("media_or_ad")
-            for item in feed.get("feed_items", [])
-            if item.get("media_or_ad")
-        ]
+        feed_items = feed.get("feed_items", [])
+        if not feed_items:
+            print("  [likes] no feed items available")
+            return
+
+        items = []
+        for item in feed_items:
+            media = item.get("media_or_ad")
+            if media:
+                items.append(media)
 
         if not items:
             return
@@ -146,21 +157,10 @@ def _like_random_feed(cl: Client, lo: int, hi: int) -> None:
             try:
                 media_id = media.get("pk") or media.get("id")
                 if media_id:
-                    cl.media_like(media_id)
+                    cl.media_like(str(media_id))
                     print(f"    liked media {media_id}")
             except Exception:
                 pass
             _rand_sleep(3, 12)
     except Exception as e:
         print(f"  [likes] error: {e}")
-
-
-def _browse_explore(cl: Client) -> None:
-    """Briefly hit the explore endpoint to look like real browsing."""
-    try:
-        # Just fetch explore — we don't need to do anything with it
-        cl.explore_page()
-        print("    browsed explore page")
-    except Exception as e:
-        print(f"  [explore] error: {e}")
-    _rand_sleep(5, 15)

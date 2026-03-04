@@ -1,10 +1,15 @@
 """
-Fader v2 — Device / Fingerprint Rotation
-Generates realistic random iPhone & Android device profiles for each session.
-instagrapi uses these to build its User-Agent and X-headers.
+Fader v2 — Device / Fingerprint Management
+Generates realistic random iPhone & Android device profiles.
+Picks ONE device per day and sticks with it (rotating mid-session is a red flag).
 """
 
+import hashlib
+import json
+import os
 import random
+from datetime import date
+from pathlib import Path
 
 # ─── iPhone Models ──────────────────────────────────────────────────
 # (model_name, device_id, ios_version, screen_dpi, screen_resolution)
@@ -54,17 +59,18 @@ IG_VERSIONS = [
     "341.0.0.0.85",
 ]
 
+# ─── Device cache file ─────────────────────────────────────────────
+_DEVICE_CACHE = os.path.join(os.path.dirname(__file__), "sessions", ".device_today.json")
 
-def random_iphone_settings() -> dict:
+
+def _make_iphone_settings() -> dict:
     """Return an instagrapi-compatible device settings dict for a random iPhone."""
     model_id, name, ios_ver, dpi, res = random.choice(IPHONE_MODELS)
-    locale, tz = random.choice(LOCALES)
     ig_ver = random.choice(IG_VERSIONS)
-    w, h = res.split("x")
 
     return {
         "app_version":   ig_ver,
-        "android_version": 0,   # ignored for iPhone but instagrapi may need it
+        "android_version": 0,
         "android_release": "",
         "dpi":           dpi,
         "resolution":    res,
@@ -76,10 +82,9 @@ def random_iphone_settings() -> dict:
     }
 
 
-def random_android_settings() -> dict:
+def _make_android_settings() -> dict:
     """Return an instagrapi-compatible device settings dict for a random Android."""
     mfr, model, device, api, release, dpi, res = random.choice(ANDROID_MODELS)
-    locale, tz = random.choice(LOCALES)
     ig_ver = random.choice(IG_VERSIONS)
 
     return {
@@ -96,8 +101,43 @@ def random_android_settings() -> dict:
     }
 
 
-def random_device_settings() -> dict:
-    """Pick a random iPhone or Android profile (70/30 split favoring iPhone)."""
+def _generate_random_device() -> dict:
+    """Pick a random iPhone or Android profile (70/30 split favoring Android)."""
+    # Android is the safer bet for private API — most real instagrapi traffic is Android
     if random.random() < 0.7:
-        return random_iphone_settings()
-    return random_android_settings()
+        return _make_android_settings()
+    return _make_iphone_settings()
+
+
+def get_device_for_today() -> dict:
+    """
+    Return a consistent device profile for today.
+    Generates one per day and caches it. A real user doesn't switch phones
+    mid-session, so neither should we.
+    """
+    today = date.today().isoformat()
+
+    # Try loading today's cached device
+    try:
+        if os.path.exists(_DEVICE_CACHE):
+            with open(_DEVICE_CACHE, "r") as f:
+                cached = json.load(f)
+            if cached.get("date") == today:
+                print(f"  [device] Reusing today's device: {cached['device'].get('model', '?')}")
+                return cached["device"]
+    except (json.JSONDecodeError, KeyError):
+        pass
+
+    # Generate fresh device for today
+    device = _generate_random_device()
+
+    # Cache it
+    try:
+        os.makedirs(os.path.dirname(_DEVICE_CACHE), exist_ok=True)
+        with open(_DEVICE_CACHE, "w") as f:
+            json.dump({"date": today, "device": device}, f, indent=2)
+    except OSError:
+        pass  # Non-fatal — worst case we regenerate next run
+
+    print(f"  [device] New device for today: {device.get('manufacturer')} {device.get('model')}")
+    return device

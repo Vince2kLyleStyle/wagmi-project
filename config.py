@@ -44,9 +44,6 @@ INTER_BATCH_SPREAD = 180     # ±3 min std-dev
 INTER_BATCH_FLOOR = 900      # never less than 15 min
 INTER_BATCH_CEIL = 1500      # never more than 25 min
 
-# ─── Session Refresh ───────────────────────────────────────────────
-REFRESH_EVERY_N_POSTS = 25   # re-login every N uploads
-
 # ─── Warm-up Phase (start of each session) ─────────────────────────
 WARMUP_MIN_SEC = 1800        # 30 min minimum warm-up
 WARMUP_MAX_SEC = 3600        # 60 min maximum warm-up

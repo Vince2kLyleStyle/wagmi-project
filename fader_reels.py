@@ -118,13 +118,14 @@ def extract_random_thumbnail(video_path: str) -> str | None:
 
 def create_client(session_file: str | None = None) -> Client:
     """
-    Create & configure an instagrapi Client with random device settings.
+    Create & configure an instagrapi Client with today's device profile.
     Loads existing session if available, otherwise logs in fresh.
+    Uses ONE consistent device per day (rotating mid-session is a red flag).
     """
     cl = Client()
 
-    # Apply random device fingerprint
-    dev = devices.random_device_settings()
+    # Apply today's device fingerprint (consistent for the whole day)
+    dev = devices.get_device_for_today()
     cl.set_device(dev)
 
     # Random request delays to look human
@@ -153,25 +154,23 @@ def create_client(session_file: str | None = None) -> Client:
     return cl
 
 
-def refresh_session(cl: Client, session_file: str) -> Client:
+def relogin_client(cl: Client, session_file: str) -> Client:
     """
-    Rotate device fingerprint and re-login.
-    Called every N posts to avoid fingerprint staleness.
+    Re-login with the SAME device profile (no rotation).
+    Only used when the session expires or gets challenged.
     """
-    print("\n  [refresh] Rotating device fingerprint & re-logging in...")
-    dev = devices.random_device_settings()
-    cl.set_device(dev)
+    print("\n  [relogin] Re-authenticating (same device)...")
 
     try:
         cl.login(config.USERNAME, config.PASSWORD)
     except Exception:
-        # If re-login fails, try a completely fresh client
+        # If re-login fails, create a fresh client (still same device for today)
         cl = create_client(session_file)
 
     if session_file:
         cl.dump_settings(session_file)
 
-    print("  [refresh] New session active.\n")
+    print("  [relogin] Session restored.\n")
     return cl
 
 
@@ -312,7 +311,6 @@ def main() -> None:
 
     # ─── Session State ──────────────────────────────────────────
     uploads_today = 0
-    uploads_since_refresh = 0
     batch_num = 0
     video_idx = 0
     session_start = datetime.now()
@@ -342,11 +340,6 @@ def main() -> None:
 
             # Re-warm-up at start of new day
             human_sim.warmup_session(cl)
-
-        # ── Session refresh check ───────────────────────────────
-        if uploads_since_refresh >= config.REFRESH_EVERY_N_POSTS:
-            cl = refresh_session(cl, session_file)
-            uploads_since_refresh = 0
 
         # ── Build batch ─────────────────────────────────────────
         batch_num += 1
@@ -383,11 +376,11 @@ def main() -> None:
                 print("  [!!] You may need to manually verify on the app.")
                 countdown_timer(7200, "Challenge pause")
                 # Try re-login
-                cl = refresh_session(cl, session_file)
+                cl = relogin_client(cl, session_file)
                 result = upload_reel(cl, vpath)
 
             if result == "LOGIN_EXPIRED":
-                cl = refresh_session(cl, session_file)
+                cl = relogin_client(cl, session_file)
                 result = upload_reel(cl, vpath)
 
             if result and result not in ("THROTTLED", "CHALLENGE", "LOGIN_EXPIRED"):
@@ -403,7 +396,6 @@ def main() -> None:
                         print(f"  [!!] Could not delete {filename}: {e}")
 
                 uploads_today += 1
-                uploads_since_refresh += 1
 
                 # Post-upload actions
                 human_sim.post_upload_actions(cl)

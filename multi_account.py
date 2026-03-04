@@ -47,7 +47,7 @@ import devices
 import human_sim
 from fader_reels import (
     create_client,
-    refresh_session,
+    relogin_client,
     upload_reel,
     log_success,
     countdown_timer,
@@ -122,17 +122,11 @@ def run_account_session(acct: dict) -> int:
     print(f"[*] Found {total_videos} videos for @{username}")
 
     uploads = 0
-    uploads_since_refresh = 0
     video_idx = 0
     batch_num = 0
     total_batches = (min(daily_cap, total_videos) + config.BATCH_SIZE - 1) // config.BATCH_SIZE
 
     while video_idx < total_videos and uploads < daily_cap:
-        # Session refresh
-        if uploads_since_refresh >= config.REFRESH_EVERY_N_POSTS:
-            cl = refresh_session(cl, session_file)
-            uploads_since_refresh = 0
-
         # Build batch
         batch_num += 1
         batch_end = min(video_idx + config.BATCH_SIZE, total_videos)
@@ -164,7 +158,7 @@ def run_account_session(acct: dict) -> int:
                 return uploads
 
             if result == "LOGIN_EXPIRED":
-                cl = refresh_session(cl, session_file)
+                cl = relogin_client(cl, session_file)
                 result = upload_reel(cl, vpath)
 
             if result and result not in ("THROTTLED", "CHALLENGE", "LOGIN_EXPIRED"):
@@ -178,7 +172,6 @@ def run_account_session(acct: dict) -> int:
                         pass
 
                 uploads += 1
-                uploads_since_refresh += 1
                 human_sim.post_upload_actions(cl)
             else:
                 print(f"  [!!] Failed: {filename}")

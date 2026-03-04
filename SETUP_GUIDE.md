@@ -146,7 +146,6 @@ All tunables live in `config.py`. Key settings:
 | `BATCH_SIZE` | 3 | Videos per mini-batch |
 | `INTRA_BATCH_MIN/MAX` | 40s / 90s | Delay between videos in a batch |
 | `INTER_BATCH_CENTER` | 3600s (60m) | Gaussian center for batch gaps |
-| `REFRESH_EVERY_N_POSTS` | 25 | Re-login & rotate fingerprint every N |
 | `DELETE_AFTER_UPLOAD` | True | Delete .mp4 after successful upload |
 | `USE_FFMPEG_THUMBNAIL` | True | Extract random frame as thumbnail |
 
