@@ -50,7 +50,8 @@ VIRAL_CAPTIONS = [
     (
         "#Japan is turning footsteps into electricity! Using piezoelectric tiles, "
         "every step you take generates a small amount of energy. Millions of steps "
-        "together can power LED lights and displays in busy places like Shibuya Station."
+        "together can power LED lights and displays in busy places like Shibuya Station. "
+        "A brilliant way to create a sustainable and smart city \u2022 turning m..."
     ),
 ]
 USE_SAME_CAPTION = True
