@@ -16,7 +16,7 @@ from datetime import datetime
 
 import scraper_config as cfg
 from tiktok_discover import scrape_tiktok, login_to_tiktok
-from telegram_sender import send_urls_sync, telegram_login_sync
+from telegram_sender import send_urls_sync, send_and_download_sync, telegram_login_sync
 
 BANNER = """
 ╔══════════════════════════════════════════════════════╗
@@ -85,6 +85,14 @@ def main():
     parser.add_argument(
         "--no-telegram", action="store_true",
         help="Skip sending URLs to Telegram bot"
+    )
+    parser.add_argument(
+        "--no-download", action="store_true",
+        help="Send URLs to bot but don't auto-download videos"
+    )
+    parser.add_argument(
+        "--download-dir", default=cfg.DOWNLOAD_DIR,
+        help=f"Folder to save downloaded videos (default: {cfg.DOWNLOAD_DIR})"
     )
     parser.add_argument(
         "--no-headless", action="store_true",
@@ -159,20 +167,33 @@ def main():
     if args.no_telegram:
         print("\n📱  Telegram: SKIPPED (--no-telegram)")
     else:
-        print("\n═" * 54)
-        print("  PHASE 2: Sending to Telegram Bot")
+        print(f"\n{'═' * 54}")
+        if args.no_download:
+            print("  PHASE 2: Sending to Telegram Bot")
+        else:
+            print("  PHASE 2: Sending to Telegram Bot + Auto-Download")
         print("═" * 54)
 
         urls = [r["url"] for r in new_results]
-        sent, failed = send_urls_sync(urls)
 
-        print(f"\n📱  Telegram: {sent} sent, {failed} failed")
+        if args.no_download:
+            sent, failed = send_urls_sync(urls)
+            print(f"\n📱  Telegram: {sent} sent, {failed} failed")
+        else:
+            sent, downloaded, failed = send_and_download_sync(
+                urls, download_dir=args.download_dir
+            )
+            print(f"\n📱  Telegram: {sent} sent, {downloaded} downloaded, {failed} failed")
+            if downloaded > 0:
+                print(f"📂  Videos saved to: {args.download_dir}")
 
     # ─── Done ─────────────────────────────────────────────────────
     print(f"\n✅  Done! {len(new_results)} videos collected.")
-    if not args.no_telegram:
+    if not args.no_telegram and not args.no_download:
+        print(f"   Videos are in: {args.download_dir}")
+    elif not args.no_telegram:
         print(f"   Check @{cfg.TELEGRAM_BOT_USERNAME} in Telegram for download links.")
-    print(f"   Move downloaded videos to ./tiktok_videos/ for the Instagram poster.\n")
+    print()
 
 
 if __name__ == "__main__":

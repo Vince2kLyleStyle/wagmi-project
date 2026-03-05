@@ -7,14 +7,20 @@ import os
 
 # ─── TikTok Search ────────────────────────────────────────────────────
 KEYWORDS = [                           # Niche keywords to search
-    "trading", "gambling", "wolf of wall street",
-    "forex", "stocks", "crypto trading", "day trading",
-    "hustle", "TJR",
+    "trading", "trading lifestyle", "trader motivation",
+    "forex", "forex lifestyle", "forex gains",
+    "stocks", "stock market", "stock trading",
+    "crypto trading", "crypto gains", "bitcoin trading",
+    "day trading", "day trader lifestyle",
+    "gambling", "gambling wins", "casino wins",
+    "wolf of wall street", "hustle motivation",
+    "hustle", "TJR", "money motivation",
+    "luxury lifestyle", "rich lifestyle",
 ]
-MAX_VIDEOS_PER_KEYWORD = 20            # Videos to collect per keyword
+MAX_VIDEOS_PER_KEYWORD = 50            # Videos to collect per keyword
 MIN_VIEWS = 100_000                    # Minimum view count (0 = no filter)
 MIN_LIKES = 5_000                      # Minimum like count (0 = no filter)
-SCROLL_COUNT = 5                       # Times to scroll for more results
+SCROLL_COUNT = 10                      # Times to scroll for more results
 HEADLESS = True                        # Run browser without GUI
 
 # ─── Telegram ─────────────────────────────────────────────────────────
@@ -29,3 +35,5 @@ TELEGRAM_SEND_DELAY_MAX = 6
 
 # ─── Output ───────────────────────────────────────────────────────────
 OUTPUT_FILE = os.path.join(os.path.dirname(__file__), "scraped_urls.txt")
+DOWNLOAD_DIR = os.path.join(os.path.dirname(__file__), "tiktok_videos")
+TELEGRAM_DOWNLOAD_TIMEOUT = 120        # Seconds to wait for bot to reply with video
