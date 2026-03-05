@@ -129,11 +129,23 @@ def scrape_tiktok(keywords, max_per_keyword=20, min_views=0, min_likes=0,
             # Wait a bit more after dismissing popups
             time.sleep(random.uniform(1, 2))
 
-            # Scroll to load more results
+            # Scroll to load more results (stop early if no new content)
+            prev_count = 0
+            stale_scrolls = 0
             for i in range(scroll_count):
                 page.evaluate("window.scrollTo(0, document.body.scrollHeight)")
-                time.sleep(random.uniform(2, 4))
-                print(f"   📜  Scroll {i + 1}/{scroll_count}")
+                time.sleep(random.uniform(2, 3.5))
+                # Check if new videos loaded
+                cur_count = len(page.query_selector_all('a[href*="/video/"]'))
+                print(f"   📜  Scroll {i + 1}/{scroll_count} ({cur_count} links)")
+                if cur_count <= prev_count:
+                    stale_scrolls += 1
+                    if stale_scrolls >= 2:
+                        print(f"   ⏹  No new videos loading, stopping early")
+                        break
+                else:
+                    stale_scrolls = 0
+                prev_count = cur_count
 
             # Extract video links and metadata
             videos = _extract_videos(page, keyword, min_views, min_likes)
@@ -146,6 +158,45 @@ def scrape_tiktok(keywords, max_per_keyword=20, min_views=0, min_likes=0,
                     new_count += 1
 
             print(f"   ✅  Found {new_count} videos for '{keyword}'")
+
+            # Try "Most liked" sort tab for additional results
+            if new_count < max_per_keyword:
+                try:
+                    liked_tab = page.query_selector(
+                        'div[data-e2e="search-sort-most-liked"], '
+                        'span:has-text("Most liked"), '
+                        'div[role="tab"]:has-text("Most liked")'
+                    )
+                    if liked_tab:
+                        liked_tab.click()
+                        time.sleep(random.uniform(3, 5))
+
+                        # Scroll the "Most liked" tab
+                        prev_count = 0
+                        stale_scrolls = 0
+                        for i in range(min(scroll_count, 5)):
+                            page.evaluate("window.scrollTo(0, document.body.scrollHeight)")
+                            time.sleep(random.uniform(2, 3.5))
+                            cur_count = len(page.query_selector_all('a[href*="/video/"]'))
+                            if cur_count <= prev_count:
+                                stale_scrolls += 1
+                                if stale_scrolls >= 2:
+                                    break
+                            else:
+                                stale_scrolls = 0
+                            prev_count = cur_count
+
+                        liked_videos = _extract_videos(page, keyword, min_views, min_likes)
+                        for vid in liked_videos:
+                            if vid["url"] not in seen_urls and new_count < max_per_keyword:
+                                seen_urls.add(vid["url"])
+                                all_results.append(vid)
+                                new_count += 1
+
+                        if new_count > 0:
+                            print(f"   ✅  +{new_count} more from 'Most liked' tab")
+                except Exception:
+                    pass
 
         context.close()
 

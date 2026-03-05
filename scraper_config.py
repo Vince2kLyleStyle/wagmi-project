@@ -18,8 +18,8 @@ KEYWORDS = [                           # Niche keywords to search
     "luxury lifestyle", "rich lifestyle",
 ]
 MAX_VIDEOS_PER_KEYWORD = 50            # Videos to collect per keyword
-MIN_VIEWS = 100_000                    # Minimum view count (0 = no filter)
-MIN_LIKES = 5_000                      # Minimum like count (0 = no filter)
+MIN_VIEWS = 0                          # Minimum view count (0 = no filter)
+MIN_LIKES = 0                          # Minimum like count (0 = no filter)
 SCROLL_COUNT = 10                      # Times to scroll for more results
 HEADLESS = True                        # Run browser without GUI
 
