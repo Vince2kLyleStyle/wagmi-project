@@ -15,7 +15,7 @@ import sys
 from datetime import datetime
 
 import scraper_config as cfg
-from tiktok_discover import scrape_tiktok
+from tiktok_discover import scrape_tiktok, login_to_tiktok
 from telegram_sender import send_urls_sync
 
 BANNER = """
@@ -55,6 +55,10 @@ def main():
 
     parser = argparse.ArgumentParser(description="Scrape viral TikTok videos by keyword")
     parser.add_argument(
+        "--login", action="store_true",
+        help="Open browser to log into TikTok (one-time setup, saves session)"
+    )
+    parser.add_argument(
         "-k", "--keywords", nargs="+", default=cfg.KEYWORDS,
         help="Keywords to search (default: from config)"
     )
@@ -88,6 +92,12 @@ def main():
     )
 
     args = parser.parse_args()
+
+    # ─── Login mode ──────────────────────────────────────────────
+    if args.login:
+        login_to_tiktok()
+        print("   You can now run the scraper:  py tiktok_scraper.py -k trading")
+        sys.exit(0)
 
     # ─── Summary ──────────────────────────────────────────────────
     print(f"  Keywords:     {', '.join(args.keywords)}")

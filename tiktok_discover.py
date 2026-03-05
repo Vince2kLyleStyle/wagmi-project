@@ -1,17 +1,20 @@
 """
 TikTok Scraper — Discover & Search Module
 Uses Playwright to scrape TikTok search results and filter by engagement.
+
+First run:  python tiktok_scraper.py --login
+            (opens browser, you log in manually, session is saved)
+After that: python tiktok_scraper.py -k trading
+            (uses saved session, no login needed)
 """
 
+import os
 import re
 import time
 import random
 
-# ─── CSS Selectors (update these if TikTok redesigns) ─────────────────
-SEARCH_CARD_SEL = '[data-e2e="search_top-item-list"] > div, [data-e2e="search-card-desc"]'
-VIDEO_LINK_SEL = 'a[href*="/video/"]'
-VIEW_COUNT_SEL = '[data-e2e="search-card-like-container"] strong, [data-e2e="video-views"]'
-FALLBACK_CARD_SEL = 'div[class*="DivItemCardContainer"], div[class*="DivVideoCard"]'
+# Persistent browser profile directory (saves cookies/login state)
+BROWSER_PROFILE_DIR = os.path.join(os.path.dirname(__file__), "tiktok_browser_profile")
 
 
 def parse_count(text: str) -> int:
@@ -30,6 +33,44 @@ def parse_count(text: str) -> int:
         return 0
 
 
+def login_to_tiktok():
+    """
+    Open a browser window for manual TikTok login.
+    Saves the session so future scraping runs don't need login.
+    """
+    from playwright.sync_api import sync_playwright
+
+    print("\n🔐  TikTok Login — Manual Setup")
+    print("   A browser window will open.")
+    print("   1. Log into TikTok (use Google, email, or QR code)")
+    print("   2. Make sure you can see the home feed")
+    print("   3. Close the browser window when done\n")
+
+    with sync_playwright() as p:
+        context = p.chromium.launch_persistent_context(
+            BROWSER_PROFILE_DIR,
+            headless=False,
+            viewport={"width": 1280, "height": 900},
+        )
+        page = context.new_page()
+        page.goto("https://www.tiktok.com/login", wait_until="domcontentloaded")
+
+        print("   ⏳  Waiting for you to log in... (close the browser when done)")
+
+        # Wait until the browser is closed by the user
+        try:
+            page.wait_for_event("close", timeout=300000)  # 5 min max
+        except Exception:
+            pass
+
+        try:
+            context.close()
+        except Exception:
+            pass
+
+    print("   ✅  Login session saved! You can now run the scraper normally.\n")
+
+
 def scrape_tiktok(keywords, max_per_keyword=20, min_views=0, min_likes=0,
                   scroll_count=5, headless=True):
     """
@@ -42,15 +83,18 @@ def scrape_tiktok(keywords, max_per_keyword=20, min_views=0, min_likes=0,
     all_results = []
     seen_urls = set()
 
+    # Check if we have a saved browser profile
+    has_profile = os.path.exists(BROWSER_PROFILE_DIR)
+    if not has_profile:
+        print("   ⚠  No saved TikTok session found.")
+        print("   ⚠  Run with --login first:  py tiktok_scraper.py --login\n")
+
     with sync_playwright() as p:
-        browser = p.chromium.launch(headless=headless)
-        context = browser.new_context(
+        # Use persistent context to retain login cookies
+        context = p.chromium.launch_persistent_context(
+            BROWSER_PROFILE_DIR,
+            headless=headless,
             viewport={"width": 1280, "height": 900},
-            user_agent=(
-                "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
-                "AppleWebKit/537.36 (KHTML, like Gecko) "
-                "Chrome/120.0.0.0 Safari/537.36"
-            ),
         )
         page = context.new_page()
 
@@ -91,7 +135,7 @@ def scrape_tiktok(keywords, max_per_keyword=20, min_views=0, min_likes=0,
 
             print(f"   ✅  Found {new_count} videos for '{keyword}'")
 
-        browser.close()
+        context.close()
 
     return all_results
 
