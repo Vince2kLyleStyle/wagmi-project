@@ -15,9 +15,9 @@ SESSION_FILE = os.path.join(SESSION_DIR, f"{USERNAME}_session.json")
 VIDEO_DIR = os.path.join(os.path.dirname(__file__), "tiktok_videos", "trading")
 
 # ─── Posting Limits ────────────────────────────────────────────────
-DAILY_MIN = 8          # minimum posts per day
-DAILY_MAX = 15         # hard cap per day
-BATCH_SIZE = 3         # videos per mini-batch
+DAILY_MIN = 30         # minimum posts per day
+DAILY_MAX = 40         # hard cap per day (~2 per 20min × 12hrs = 72 max, stay under)
+BATCH_SIZE = 2         # videos per mini-batch
 
 # ─── Caption ──────────────────────────────────────────────────────
 # 3 captions — one is randomly picked for each upload
@@ -42,14 +42,14 @@ USE_SAME_CAPTION = True
 
 # ─── Timing (seconds) ──────────────────────────────────────────────
 # Between videos in a batch
-INTRA_BATCH_MIN = 20
-INTRA_BATCH_MAX = 60
+INTRA_BATCH_MIN = 30
+INTRA_BATCH_MAX = 90
 
 # Between batches (~20 min with jitter)
 INTER_BATCH_CENTER = 1200    # 20 min center
-INTER_BATCH_SPREAD = 180     # +/- 3 min std-dev
-INTER_BATCH_FLOOR = 900      # never less than 15 min
-INTER_BATCH_CEIL = 1500      # never more than 25 min
+INTER_BATCH_SPREAD = 300     # +/- 5 min std-dev (more natural)
+INTER_BATCH_FLOOR = 720      # never less than 12 min
+INTER_BATCH_CEIL = 1800      # never more than 30 min
 
 # ─── Throttle / Error Handling ─────────────────────────────────────
 THROTTLE_SLEEP_MIN = 1800    # 30 min
