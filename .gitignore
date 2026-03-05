@@ -1,0 +1,19 @@
+# Credentials — NEVER commit these
+accounts.json
+sessions/
+*.session
+
+# Downloaded videos
+tiktok_videos/
+
+# Browser profile (contains cookies)
+tiktok_browser_profile/
+
+# Logs
+success.txt
+scraped_urls.txt
+
+# Python
+__pycache__/
+*.pyc
+.env

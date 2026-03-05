@@ -6,13 +6,13 @@ All tunables in one place.
 import os
 
 # ─── Account ────────────────────────────────────────────────────────
-USERNAME = os.getenv("IG_USERNAME", "your_username")
-PASSWORD = os.getenv("IG_PASSWORD", "your_password")
+USERNAME = os.getenv("IG_USERNAME", "dumbmoneyonsolana")
+PASSWORD = os.getenv("IG_PASSWORD", "InstagramPassword1")
 SESSION_DIR = os.path.join(os.path.dirname(__file__), "sessions")
 SESSION_FILE = os.path.join(SESSION_DIR, f"{USERNAME}_session.json")
 
 # ─── Video Source ───────────────────────────────────────────────────
-VIDEO_DIR = os.path.join(os.path.dirname(__file__), "tiktok_videos")
+VIDEO_DIR = os.path.join(os.path.dirname(__file__), "tiktok_videos", "trading")
 
 # ─── Posting Limits ────────────────────────────────────────────────
 DAILY_MIN = 8          # minimum posts per day
