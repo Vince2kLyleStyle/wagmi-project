@@ -42,8 +42,6 @@ import time
 from datetime import datetime, timedelta
 
 import config
-import captions
-import devices
 import human_sim
 from fader_reels import (
     create_client,
@@ -142,7 +140,7 @@ def run_account_session(acct: dict) -> int:
                 break
 
             filename = os.path.basename(vpath)
-            human_sim.pre_upload_actions(cl)
+            human_sim.pre_upload_pause()
 
             print(f"\n  Uploading [{video_idx + 1}]: {filename}")
             result = upload_reel(cl, vpath)
@@ -172,7 +170,7 @@ def run_account_session(acct: dict) -> int:
                         pass
 
                 uploads += 1
-                human_sim.post_upload_actions(cl)
+                human_sim.post_upload_pause()
             else:
                 print(f"  [!!] Failed: {filename}")
 

@@ -125,7 +125,7 @@ def create_client(session_file: str | None = None) -> Client:
     cl = Client()
 
     # Apply today's device fingerprint (consistent for the whole day)
-    dev = devices.get_device_for_today()
+    dev = devices.get_device()
     cl.set_device(dev)
 
     # Random request delays to look human
@@ -356,8 +356,8 @@ def main() -> None:
         for i, vpath in enumerate(batch_videos):
             filename = os.path.basename(vpath)
 
-            # Pre-upload human actions
-            human_sim.pre_upload_actions(cl)
+            # Short pause before upload
+            human_sim.pre_upload_pause()
 
             print(f"\n  Uploading [{video_idx + 1}/{total_videos}]: {filename}")
             result = upload_reel(cl, vpath)
@@ -397,8 +397,8 @@ def main() -> None:
 
                 uploads_today += 1
 
-                # Post-upload actions
-                human_sim.post_upload_actions(cl)
+                # Short pause after upload
+                human_sim.post_upload_pause()
             else:
                 print(f"  [!!] Failed to upload: {filename} (skipping)")
 
