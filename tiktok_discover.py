@@ -16,6 +16,14 @@ import random
 # Persistent browser profile directory (saves cookies/login state)
 BROWSER_PROFILE_DIR = os.path.join(os.path.dirname(__file__), "tiktok_browser_profile")
 
+# Stealth args — strip automation fingerprints so TikTok doesn't block login
+STEALTH_ARGS = [
+    "--disable-blink-features=AutomationControlled",
+    "--no-first-run",
+    "--no-default-browser-check",
+    "--disable-infobars",
+]
+
 
 def parse_count(text: str) -> int:
     """Parse abbreviated counts like '1.5M', '200K', '10B' into integers."""
@@ -50,6 +58,8 @@ def login_to_tiktok():
         context = p.chromium.launch_persistent_context(
             BROWSER_PROFILE_DIR,
             headless=False,
+            channel="chrome",
+            args=STEALTH_ARGS,
             viewport={"width": 1280, "height": 900},
         )
         page = context.new_page()
@@ -90,10 +100,12 @@ def scrape_tiktok(keywords, max_per_keyword=20, min_views=0, min_likes=0,
         print("   ⚠  Run with --login first:  py tiktok_scraper.py --login\n")
 
     with sync_playwright() as p:
-        # Use persistent context to retain login cookies
+        # Use persistent context with real Chrome to retain login cookies
         context = p.chromium.launch_persistent_context(
             BROWSER_PROFILE_DIR,
             headless=headless,
+            channel="chrome",
+            args=STEALTH_ARGS,
             viewport={"width": 1280, "height": 900},
         )
         page = context.new_page()
