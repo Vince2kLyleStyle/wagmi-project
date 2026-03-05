@@ -16,7 +16,7 @@ from datetime import datetime
 
 import scraper_config as cfg
 from tiktok_discover import scrape_tiktok, login_to_tiktok
-from telegram_sender import send_urls_sync
+from telegram_sender import send_urls_sync, telegram_login_sync
 
 BANNER = """
 ╔══════════════════════════════════════════════════════╗
@@ -59,6 +59,10 @@ def main():
         help="Open browser to log into TikTok (one-time setup, saves session)"
     )
     parser.add_argument(
+        "--telegram-login", action="store_true",
+        help="Log into Telegram (one-time setup, saves session for sending URLs)"
+    )
+    parser.add_argument(
         "-k", "--keywords", nargs="+", default=cfg.KEYWORDS,
         help="Keywords to search (default: from config)"
     )
@@ -93,10 +97,14 @@ def main():
 
     args = parser.parse_args()
 
-    # ─── Login mode ──────────────────────────────────────────────
+    # ─── Login modes ─────────────────────────────────────────────
     if args.login:
         login_to_tiktok()
         print("   You can now run the scraper:  py tiktok_scraper.py -k trading")
+        sys.exit(0)
+
+    if args.telegram_login:
+        telegram_login_sync()
         sys.exit(0)
 
     # ─── Summary ──────────────────────────────────────────────────

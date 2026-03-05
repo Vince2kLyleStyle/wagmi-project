@@ -238,35 +238,84 @@ def _extract_videos(page, keyword, min_views, min_likes):
 
     # Now try to get view counts for each video
     view_counts = {}
+
+    # Strategy A: Extract from embedded JSON data (most reliable)
     try:
-        # Grab all visible text elements that look like view counts
         view_data = page.evaluate("""() => {
             const data = {};
-            // Look for elements with view count text near video links
-            const allElements = document.querySelectorAll(
-                '[data-e2e*="video-views"], [class*="video-count"], ' +
-                'strong[data-e2e], [class*="PlayCount"], [class*="play-count"]'
-            );
-            for (const el of allElements) {
-                const text = el.textContent.trim();
-                if (text && /^[\\d.]+[KMB]?$/i.test(text)) {
-                    // Find the nearest video link
-                    const card = el.closest('div[class*="Card"], div[class*="item"], div[data-e2e]');
-                    if (card) {
-                        const link = card.querySelector('a[href*="/video/"]');
-                        if (link) {
-                            const match = link.href.match(/\\/video\\/(\\d+)/);
-                            if (match) data[match[1]] = text;
-                        }
+            // Try window globals that TikTok uses to hydrate the page
+            for (const key of ['__UNIVERSAL_DATA_FOR_REHYDRATION__', 'SIGI_STATE', '__NEXT_DATA__']) {
+                try {
+                    const obj = window[key];
+                    if (!obj) continue;
+                    const str = JSON.stringify(obj);
+                    const idMatches = [...str.matchAll(/"id"\\s*:\\s*"(\\d{15,})"/g)];
+                    for (const m of idMatches) {
+                        const vidId = m[1];
+                        const idx = str.indexOf('"' + vidId + '"');
+                        if (idx === -1) continue;
+                        const chunk = str.substring(idx, idx + 800);
+                        const pc = chunk.match(/"playCount"\\s*[:]\\s*"?(\\d+)"?/);
+                        if (pc) data[vidId] = pc[1];
+                    }
+                } catch(e) {}
+            }
+            // Also scan script tags for playCount patterns
+            if (Object.keys(data).length === 0) {
+                const scripts = document.querySelectorAll('script');
+                for (const s of scripts) {
+                    const text = s.textContent || '';
+                    if (text.length < 100 || !text.includes('playCount')) continue;
+                    const idMatches = [...text.matchAll(/"id"\\s*:\\s*"(\\d{15,})"/g)];
+                    for (const m of idMatches) {
+                        const vidId = m[1];
+                        const idx = text.indexOf('"' + vidId + '"');
+                        if (idx === -1) continue;
+                        const chunk = text.substring(idx, idx + 800);
+                        const pc = chunk.match(/"playCount"\\s*[:]\\s*"?(\\d+)"?/);
+                        if (pc) data[vidId] = pc[1];
                     }
                 }
             }
             return data;
         }""")
         if view_data:
-            view_counts = {vid_id: parse_count(count) for vid_id, count in view_data.items()}
+            view_counts = {vid_id: int(count) for vid_id, count in view_data.items()}
     except Exception:
         pass
+
+    # Strategy B: DOM-based extraction (fallback)
+    if not view_counts:
+        try:
+            view_data = page.evaluate("""() => {
+                const data = {};
+                const cards = document.querySelectorAll(
+                    'div[data-e2e="search-card-container"], ' +
+                    'div[class*="DivItemContainer"], ' +
+                    'div[class*="VideoCard"], ' +
+                    'div[class*="video-feed-item"], ' +
+                    'div[class*="DivWrapper"]'
+                );
+                for (const card of cards) {
+                    const link = card.querySelector('a[href*="/video/"]');
+                    if (!link) continue;
+                    const match = link.href.match(/\\/video\\/(\\d+)/);
+                    if (!match) continue;
+                    const elems = card.querySelectorAll('strong, span');
+                    for (const el of elems) {
+                        const t = el.textContent.trim();
+                        if (/^[\\d.]+[KMB]?$/i.test(t) && t.length <= 10) {
+                            data[match[1]] = t;
+                            break;
+                        }
+                    }
+                }
+                return data;
+            }""")
+            if view_data:
+                view_counts = {vid_id: parse_count(count) for vid_id, count in view_data.items()}
+        except Exception:
+            pass
 
     # Build results
     for video_id in seen_ids:

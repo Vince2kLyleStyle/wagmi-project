@@ -23,6 +23,7 @@ TELEGRAM_API_HASH = os.getenv("TELEGRAM_API_HASH", "")
 TELEGRAM_BOT_USERNAME = "OFMTikTokBot"
 TELEGRAM_SESSION_DIR = os.path.join(os.path.dirname(__file__), "sessions")
 TELEGRAM_SESSION_NAME = "tiktok_scraper"
+TELEGRAM_PHONE = os.getenv("TELEGRAM_PHONE", "")  # Your phone number for first-time auth
 TELEGRAM_SEND_DELAY_MIN = 3           # Seconds between messages
 TELEGRAM_SEND_DELAY_MAX = 6
 
