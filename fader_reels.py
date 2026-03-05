@@ -321,18 +321,16 @@ def main() -> None:
 
         # ── Daily cap check ─────────────────────────────────────
         if uploads_today >= daily_cap:
-            now = datetime.now()
-            tomorrow = (now + timedelta(days=1)).replace(
-                hour=random.randint(7, 11),
-                minute=random.randint(0, 59),
-                second=0, microsecond=0,
-            )
-            sleep_sec = int((tomorrow - now).total_seconds())
+            # Sleep 5-7 hours (jittered), then resume
+            sleep_hours = random.uniform(5, 7)
+            sleep_sec = int(sleep_hours * 3600)
+            wake_time = datetime.now() + timedelta(seconds=sleep_sec)
             print(f"\n{'='*60}")
             print(f"  DAILY CAP REACHED ({uploads_today}/{daily_cap})")
-            print(f"  Sleeping until {tomorrow.strftime('%Y-%m-%d %H:%M:%S')}")
+            print(f"  Sleeping {sleep_hours:.1f} hours")
+            print(f"  Waking up at {wake_time.strftime('%H:%M:%S')}")
             print(f"{'='*60}\n")
-            countdown_timer(sleep_sec, "Daily pause")
+            countdown_timer(sleep_sec, "Sleep break")
 
             # Reset for new day
             uploads_today = 0
