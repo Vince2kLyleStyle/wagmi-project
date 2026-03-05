@@ -1,0 +1,20 @@
+[
+    {
+        "niche": "trading",
+        "username": "your_trading_ig_account",
+        "password": "your_password",
+        "daily_cap": 12
+    },
+    {
+        "niche": "gambling",
+        "username": "your_gambling_ig_account",
+        "password": "your_password",
+        "daily_cap": 10
+    },
+    {
+        "niche": "hustle",
+        "username": "your_hustle_ig_account",
+        "password": "your_password",
+        "daily_cap": 10
+    }
+]

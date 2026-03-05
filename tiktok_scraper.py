@@ -1,12 +1,14 @@
 #!/usr/bin/env python3
 """
 TikTok Scraper — CLI Entry Point
-Scrapes trending TikTok videos by keyword and sends URLs to a Telegram download bot.
+Scrapes trending TikTok videos by niche/keyword, downloads via Telegram bot,
+and saves to niche-specific folders for Instagram posting.
 
 Usage:
-    python tiktok_scraper.py -k gym motivation --max 15
-    python tiktok_scraper.py -k cooking --min-views 500000 --no-telegram
-    python tiktok_scraper.py -k dance --no-headless   # show browser for debugging
+    py tiktok_scraper.py --niche trading              # scrape trading niche
+    py tiktok_scraper.py --niche trading gambling      # scrape multiple niches
+    py tiktok_scraper.py -k "custom keyword"           # custom keywords
+    py tiktok_scraper.py --niches                      # list available niches
 """
 
 import argparse
@@ -21,7 +23,7 @@ from telegram_sender import send_urls_sync, send_and_download_sync, telegram_log
 BANNER = """
 ╔══════════════════════════════════════════════════════╗
 ║       TikTok Scraper — Find Viral Content            ║
-║       Scrape → Filter → Send to Telegram             ║
+║       Scrape → Download → Instagram Pipeline         ║
 ╚══════════════════════════════════════════════════════╝
 """
 
@@ -33,7 +35,6 @@ def load_existing_urls(filepath):
     urls = set()
     with open(filepath, "r") as f:
         for line in f:
-            # Format: "timestamp | keyword | views | url"
             parts = line.strip().split(" | ")
             if len(parts) >= 4:
                 urls.add(parts[-1])
@@ -50,21 +51,91 @@ def save_urls(results, filepath):
             f.write(f"{timestamp} | {r['keyword']} | {views_str} views | {r['url']}\n")
 
 
+def run_niche(niche_name, keywords, args, existing_urls):
+    """Scrape + download for a single niche. Returns count of new videos."""
+    download_dir = os.path.join(cfg.DOWNLOAD_DIR, niche_name)
+
+    print(f"\n{'═' * 54}")
+    print(f"  NICHE: {niche_name}")
+    print(f"  Keywords: {', '.join(keywords)}")
+    print(f"  Download: {download_dir}")
+    print(f"{'═' * 54}")
+
+    results = scrape_tiktok(
+        keywords=keywords,
+        max_per_keyword=args.max,
+        min_views=args.min_views,
+        min_likes=args.min_likes,
+        scroll_count=args.scrolls,
+        headless=not args.no_headless,
+    )
+
+    if not results:
+        print(f"\n  ⚠  No videos found for '{niche_name}'")
+        return 0
+
+    new_results = [r for r in results if r["url"] not in existing_urls]
+    # Add to existing set so cross-niche dedup works
+    for r in new_results:
+        existing_urls.add(r["url"])
+
+    print(f"\n  📊  {niche_name}: {len(results)} found, {len(new_results)} new")
+
+    if not new_results:
+        print(f"  All videos already scraped for '{niche_name}'.")
+        return 0
+
+    save_urls(new_results, args.output)
+
+    # Print results
+    for r in new_results[:10]:  # Show first 10
+        views = f"{r['views']:>10,}" if r["views"] else "   unknown"
+        print(f"  {views} views | {r['url']}")
+    if len(new_results) > 10:
+        print(f"  ... and {len(new_results) - 10} more")
+
+    # Download via Telegram
+    if args.no_telegram:
+        pass
+    else:
+        urls = [r["url"] for r in new_results]
+        if args.no_download:
+            sent, failed = send_urls_sync(urls)
+            print(f"  📱  Sent {sent}, failed {failed}")
+        else:
+            sent, downloaded, failed = send_and_download_sync(
+                urls, download_dir=download_dir
+            )
+            print(f"  📱  Sent {sent}, downloaded {downloaded}, failed {failed}")
+            if downloaded > 0:
+                print(f"  📂  Saved to: {download_dir}")
+
+    return len(new_results)
+
+
 def main():
     print(BANNER)
 
-    parser = argparse.ArgumentParser(description="Scrape viral TikTok videos by keyword")
+    parser = argparse.ArgumentParser(description="Scrape viral TikTok videos by niche")
     parser.add_argument(
         "--login", action="store_true",
-        help="Open browser to log into TikTok (one-time setup, saves session)"
+        help="Open browser to log into TikTok (one-time setup)"
     )
     parser.add_argument(
         "--telegram-login", action="store_true",
-        help="Log into Telegram (one-time setup, saves session for sending URLs)"
+        help="Log into Telegram (one-time setup)"
     )
     parser.add_argument(
-        "-k", "--keywords", nargs="+", default=cfg.KEYWORDS,
-        help="Keywords to search (default: from config)"
+        "--niches", action="store_true",
+        help="List all available niches and their keywords"
+    )
+    parser.add_argument(
+        "--niche", nargs="+", default=None,
+        help="Niche(s) to scrape (e.g. --niche trading gambling)"
+    )
+    parser.add_argument(
+        "-k", "--keywords", nargs="+", default=None,
+        help="Custom keywords (downloads to tiktok_videos/custom/)"
     )
     parser.add_argument(
         "--max", type=int, default=cfg.MAX_VIDEOS_PER_KEYWORD,
@@ -80,7 +151,7 @@ def main():
     )
     parser.add_argument(
         "--scrolls", type=int, default=cfg.SCROLL_COUNT,
-        help=f"Scroll count for loading more results (default: {cfg.SCROLL_COUNT})"
+        help=f"Scroll count (default: {cfg.SCROLL_COUNT})"
     )
     parser.add_argument(
         "--no-telegram", action="store_true",
@@ -88,19 +159,15 @@ def main():
     )
     parser.add_argument(
         "--no-download", action="store_true",
-        help="Send URLs to bot but don't auto-download videos"
-    )
-    parser.add_argument(
-        "--download-dir", default=cfg.DOWNLOAD_DIR,
-        help=f"Folder to save downloaded videos (default: {cfg.DOWNLOAD_DIR})"
+        help="Send URLs to bot but don't auto-download"
     )
     parser.add_argument(
         "--no-headless", action="store_true",
-        help="Show browser window (useful for debugging/CAPTCHAs)"
+        help="Show browser window"
     )
     parser.add_argument(
         "-o", "--output", default=cfg.OUTPUT_FILE,
-        help=f"Output file path (default: {cfg.OUTPUT_FILE})"
+        help=f"URL log file (default: {cfg.OUTPUT_FILE})"
     )
 
     args = parser.parse_args()
@@ -108,92 +175,71 @@ def main():
     # ─── Login modes ─────────────────────────────────────────────
     if args.login:
         login_to_tiktok()
-        print("   You can now run the scraper:  py tiktok_scraper.py -k trading")
+        print("   You can now run:  py tiktok_scraper.py --niche trading")
         sys.exit(0)
 
     if args.telegram_login:
         telegram_login_sync()
         sys.exit(0)
 
-    # ─── Summary ──────────────────────────────────────────────────
-    print(f"  Keywords:     {', '.join(args.keywords)}")
+    # ─── List niches ─────────────────────────────────────────────
+    if args.niches:
+        print("  Available niches:\n")
+        for name, kws in cfg.NICHES.items():
+            print(f"    {name:15s} → {', '.join(kws[:5])}{'...' if len(kws) > 5 else ''}")
+        print(f"\n  Usage:  py tiktok_scraper.py --niche {list(cfg.NICHES.keys())[0]}")
+        print(f"  All:    py tiktok_scraper.py --niche {' '.join(cfg.NICHES.keys())}")
+        sys.exit(0)
+
+    # ─── Determine what to scrape ────────────────────────────────
+    # Build list of (niche_name, keywords) pairs
+    scrape_jobs = []
+
+    if args.niche:
+        for niche_name in args.niche:
+            if niche_name not in cfg.NICHES:
+                print(f"  ❌  Unknown niche: '{niche_name}'")
+                print(f"  Available: {', '.join(cfg.NICHES.keys())}")
+                print(f"  Or use -k for custom keywords.")
+                sys.exit(1)
+            scrape_jobs.append((niche_name, cfg.NICHES[niche_name]))
+    elif args.keywords:
+        scrape_jobs.append(("custom", args.keywords))
+    else:
+        # Default: scrape ALL niches
+        for name, kws in cfg.NICHES.items():
+            scrape_jobs.append((name, kws))
+
+    # ─── Summary ─────────────────────────────────────────────────
+    niche_names = [j[0] for j in scrape_jobs]
+    total_keywords = sum(len(j[1]) for j in scrape_jobs)
+    print(f"  Niches:       {', '.join(niche_names)}")
+    print(f"  Keywords:     {total_keywords} total")
     print(f"  Max/keyword:  {args.max}")
-    print(f"  Min views:    {args.min_views:,}")
     print(f"  Headless:     {not args.no_headless}")
     print(f"  Telegram:     {'OFF' if args.no_telegram else 'ON → @' + cfg.TELEGRAM_BOT_USERNAME}")
-    print(f"  Output:       {args.output}")
+    print(f"  Download to:  {cfg.DOWNLOAD_DIR}/<niche>/")
     print()
 
-    # ─── Scrape ───────────────────────────────────────────────────
-    print("═" * 54)
-    print("  PHASE 1: Scraping TikTok")
-    print("═" * 54)
-
-    results = scrape_tiktok(
-        keywords=args.keywords,
-        max_per_keyword=args.max,
-        min_views=args.min_views,
-        min_likes=args.min_likes,
-        scroll_count=args.scrolls,
-        headless=not args.no_headless,
-    )
-
-    if not results:
-        print("\n⚠  No videos found. Try different keywords or lower the view filter.")
-        sys.exit(0)
-
-    # ─── Deduplicate ──────────────────────────────────────────────
+    # ─── Run each niche ──────────────────────────────────────────
     existing = load_existing_urls(args.output)
-    new_results = [r for r in results if r["url"] not in existing]
+    total_new = 0
 
-    print(f"\n📊  Results: {len(results)} total, {len(new_results)} new")
+    for niche_name, keywords in scrape_jobs:
+        count = run_niche(niche_name, keywords, args, existing)
+        total_new += count
 
-    if not new_results:
-        print("   All videos already scraped. Nothing new to send.")
-        sys.exit(0)
-
-    # ─── Save ─────────────────────────────────────────────────────
-    save_urls(new_results, args.output)
-    print(f"💾  Saved {len(new_results)} URLs to {args.output}")
-
-    # ─── Print results ────────────────────────────────────────────
-    print(f"\n{'─' * 54}")
-    for r in new_results:
-        views = f"{r['views']:>10,}" if r["views"] else "   unknown"
-        print(f"  {views} views | {r['url']}")
-    print(f"{'─' * 54}")
-
-    # ─── Telegram ─────────────────────────────────────────────────
-    if args.no_telegram:
-        print("\n📱  Telegram: SKIPPED (--no-telegram)")
-    else:
-        print(f"\n{'═' * 54}")
-        if args.no_download:
-            print("  PHASE 2: Sending to Telegram Bot")
-        else:
-            print("  PHASE 2: Sending to Telegram Bot + Auto-Download")
-        print("═" * 54)
-
-        urls = [r["url"] for r in new_results]
-
-        if args.no_download:
-            sent, failed = send_urls_sync(urls)
-            print(f"\n📱  Telegram: {sent} sent, {failed} failed")
-        else:
-            sent, downloaded, failed = send_and_download_sync(
-                urls, download_dir=args.download_dir
-            )
-            print(f"\n📱  Telegram: {sent} sent, {downloaded} downloaded, {failed} failed")
-            if downloaded > 0:
-                print(f"📂  Videos saved to: {args.download_dir}")
-
-    # ─── Done ─────────────────────────────────────────────────────
-    print(f"\n✅  Done! {len(new_results)} videos collected.")
-    if not args.no_telegram and not args.no_download:
-        print(f"   Videos are in: {args.download_dir}")
-    elif not args.no_telegram:
-        print(f"   Check @{cfg.TELEGRAM_BOT_USERNAME} in Telegram for download links.")
-    print()
+    # ─── Done ────────────────────────────────────────────────────
+    print(f"\n{'═' * 54}")
+    print(f"  ALL DONE! {total_new} new videos collected.")
+    if total_new > 0:
+        print(f"  Videos organized by niche in: {cfg.DOWNLOAD_DIR}/")
+        for name, _ in scrape_jobs:
+            niche_dir = os.path.join(cfg.DOWNLOAD_DIR, name)
+            if os.path.exists(niche_dir):
+                count = len([f for f in os.listdir(niche_dir) if f.endswith('.mp4')])
+                print(f"    {name:15s} → {count} videos")
+    print(f"{'═' * 54}\n")
 
 
 if __name__ == "__main__":
