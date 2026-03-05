@@ -64,11 +64,14 @@ def scrape_tiktok(keywords, max_per_keyword=20, min_views=0, min_likes=0,
                 print(f"   ⚠  Failed to load search page: {e}")
                 continue
 
-            # Wait for content to render
-            time.sleep(random.uniform(3, 5))
+            # Wait for content to fully render
+            time.sleep(random.uniform(4, 7))
 
             # Dismiss cookie/login popups if they appear
             _dismiss_popups(page)
+
+            # Wait a bit more after dismissing popups
+            time.sleep(random.uniform(1, 2))
 
             # Scroll to load more results
             for i in range(scroll_count):
@@ -114,51 +117,127 @@ def _dismiss_popups(page):
 def _extract_videos(page, keyword, min_views, min_likes):
     """Extract video URLs and view counts from the current page."""
     results = []
+    seen_ids = set()
 
-    # Strategy 1: Find all video links on the page
-    links = page.query_selector_all('a[href*="/video/"]')
+    # Strategy 1: Pull video URLs from page HTML via regex (most reliable)
+    try:
+        html = page.content()
+        url_matches = re.findall(
+            r'https?://(?:www\.)?tiktok\.com/@[\w.]+/video/(\d+)', html
+        )
+        for video_id in url_matches:
+            if video_id not in seen_ids:
+                seen_ids.add(video_id)
+    except Exception:
+        pass
 
-    seen_in_page = set()
-    for link in links:
-        href = link.get_attribute("href")
-        if not href or "/video/" not in href:
-            continue
+    # Strategy 2: Find all anchor tags with /video/ in href
+    try:
+        links = page.query_selector_all('a[href*="/video/"]')
+        for link in links:
+            href = link.get_attribute("href") or ""
+            match = re.search(r'/video/(\d+)', href)
+            if match and match.group(1) not in seen_ids:
+                seen_ids.add(match.group(1))
+    except Exception:
+        pass
 
-        # Normalize URL
-        if href.startswith("/"):
-            href = "https://www.tiktok.com" + href
+    # Strategy 3: Extract from TikTok's embedded JSON data (SIGI_STATE or __NEXT_DATA__)
+    try:
+        json_data = page.evaluate("""() => {
+            // TikTok stores video data in script tags or window objects
+            const scripts = document.querySelectorAll('script');
+            const urls = [];
+            for (const s of scripts) {
+                const text = s.textContent || '';
+                const matches = text.match(/"id":"(\\d{15,})"/g);
+                if (matches) {
+                    for (const m of matches) {
+                        const id = m.match(/"id":"(\\d+)"/);
+                        if (id) urls.push(id[1]);
+                    }
+                }
+            }
+            return urls;
+        }""")
+        for video_id in (json_data or []):
+            if video_id not in seen_ids:
+                seen_ids.add(video_id)
+    except Exception:
+        pass
 
-        # Extract video ID to deduplicate
-        video_id_match = re.search(r"/video/(\d+)", href)
-        if not video_id_match:
-            continue
-        video_id = video_id_match.group(1)
-        if video_id in seen_in_page:
-            continue
-        seen_in_page.add(video_id)
-
-        # Try to get view count from nearby elements
-        views = 0
+    if not seen_ids:
+        # Debug: dump what we can see on the page
         try:
-            parent = link.evaluate_handle(
-                "el => el.closest('div[class*=\"Card\"], div[class*=\"item\"]')"
-            )
-            if parent:
-                view_el = parent.as_element().query_selector(
-                    'strong[data-e2e="video-views"], span[class*="SpanCount"], '
-                    'strong[class*="Strong"]'
-                )
-                if view_el:
-                    views = parse_count(view_el.inner_text())
+            title = page.title()
+            url = page.url
+            all_links = page.query_selector_all('a')
+            link_count = len(all_links)
+            print(f"   ⚠  Debug: page title='{title}', url='{url}', links on page={link_count}")
+        except Exception:
+            pass
+        return results
+
+    print(f"   🔗  Found {len(seen_ids)} unique video IDs")
+
+    # Now try to get view counts for each video
+    view_counts = {}
+    try:
+        # Grab all visible text elements that look like view counts
+        view_data = page.evaluate("""() => {
+            const data = {};
+            // Look for elements with view count text near video links
+            const allElements = document.querySelectorAll(
+                '[data-e2e*="video-views"], [class*="video-count"], ' +
+                'strong[data-e2e], [class*="PlayCount"], [class*="play-count"]'
+            );
+            for (const el of allElements) {
+                const text = el.textContent.trim();
+                if (text && /^[\\d.]+[KMB]?$/i.test(text)) {
+                    // Find the nearest video link
+                    const card = el.closest('div[class*="Card"], div[class*="item"], div[data-e2e]');
+                    if (card) {
+                        const link = card.querySelector('a[href*="/video/"]');
+                        if (link) {
+                            const match = link.href.match(/\\/video\\/(\\d+)/);
+                            if (match) data[match[1]] = text;
+                        }
+                    }
+                }
+            }
+            return data;
+        }""")
+        if view_data:
+            view_counts = {vid_id: parse_count(count) for vid_id, count in view_data.items()}
+    except Exception:
+        pass
+
+    # Build results
+    for video_id in seen_ids:
+        views = view_counts.get(video_id, 0)
+
+        # Apply view filter (skip if views are known and below threshold)
+        if min_views and views > 0 and views < min_views:
+            continue
+
+        # Reconstruct URL — we may not have the username, so use a redirect-friendly format
+        # TikTok resolves /video/ID even without the username
+        url = f"https://www.tiktok.com/@_/video/{video_id}"
+
+        # Try to find the real URL with username from the page
+        try:
+            real_link = page.query_selector(f'a[href*="/video/{video_id}"]')
+            if real_link:
+                real_href = real_link.get_attribute("href") or ""
+                if real_href.startswith("http"):
+                    url = real_href
+                elif real_href.startswith("/"):
+                    url = "https://www.tiktok.com" + real_href
         except Exception:
             pass
 
-        # Apply filters
-        if min_views and views < min_views and views > 0:
-            continue
-
         results.append({
-            "url": href,
+            "url": url,
             "views": views,
             "keyword": keyword,
         })
