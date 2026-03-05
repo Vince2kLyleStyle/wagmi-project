@@ -15,6 +15,7 @@ Optional: ffmpeg on PATH for random thumbnail extraction
 """
 
 import argparse
+import gc
 import glob
 import json
 import os
@@ -180,9 +181,9 @@ def upload_reel(cl: Client, video_path: str) -> str | None:
     """
     Upload a single Reel. Returns the media ID on success, None on failure.
     """
-    # Use the same viral caption every time (the method) or randomize
+    # Pick from the 3 preset captions, or use the random generator
     if config.USE_SAME_CAPTION:
-        caption = config.VIRAL_CAPTION
+        caption = random.choice(config.VIRAL_CAPTIONS)
     else:
         caption = captions.generate_caption()
     thumbnail = extract_random_thumbnail(video_path)
@@ -286,7 +287,7 @@ def main() -> None:
     print(f"  Account:    @{config.USERNAME}")
     print(f"  Daily cap:  {daily_cap} Reels")
     print(f"  Batch size: {config.BATCH_SIZE} every ~{config.INTER_BATCH_CENTER // 60}min")
-    print(f"  Caption:    {'SAME viral caption' if config.USE_SAME_CAPTION else 'randomized'}")
+    print(f"  Caption:    {'rotating (3 presets)' if config.USE_SAME_CAPTION else 'fully randomized'}")
     print(f"  Video dir:  {config.VIDEO_DIR}")
     print(f"  Session:    {session_file}")
     print()
@@ -389,11 +390,19 @@ def main() -> None:
                 log_success(filename, result)
 
                 if config.DELETE_AFTER_UPLOAD:
-                    try:
-                        os.remove(vpath)
-                        print(f"  [--] Deleted local file: {filename}")
-                    except OSError as e:
-                        print(f"  [!!] Could not delete {filename}: {e}")
+                    # Force-close any lingering file handles from instagrapi
+                    gc.collect()
+                    deleted = False
+                    for attempt in range(5):
+                        try:
+                            os.remove(vpath)
+                            print(f"  [--] Deleted local file: {filename}")
+                            deleted = True
+                            break
+                        except OSError:
+                            time.sleep(1)
+                    if not deleted:
+                        print(f"  [!!] Could not delete {filename} (will retry next run)")
 
                 uploads_today += 1
 

@@ -20,11 +20,24 @@ DAILY_MAX = 15         # hard cap per day
 BATCH_SIZE = 3         # videos per mini-batch
 
 # ─── Caption ──────────────────────────────────────────────────────
-VIRAL_CAPTION = (
-    "Follow for more 🔥💯\n"
-    ".\n.\n.\n"
-    "#viral #fyp #foryou #explore #trending #reels #reelsinstagram"
-)
+# 3 captions — one is randomly picked for each upload
+VIRAL_CAPTIONS = [
+    (
+        "Follow for more 🔥💯\n"
+        ".\n.\n.\n"
+        "#viral #fyp #foryou #explore #trending #reels #reelsinstagram"
+    ),
+    (
+        "You need to see this 👀🤯\n"
+        ".\n.\n.\n"
+        "#viral #fyp #foryou #explore #trending #reels #instareels"
+    ),
+    (
+        "Save this for later 🚀💎\n"
+        ".\n.\n.\n"
+        "#viral #fyp #foryou #explore #trending #reels #viralreels"
+    ),
+]
 USE_SAME_CAPTION = True
 
 # ─── Timing (seconds) ──────────────────────────────────────────────
@@ -43,7 +56,7 @@ THROTTLE_SLEEP_MIN = 1800    # 30 min
 THROTTLE_SLEEP_MAX = 7200    # 120 min
 
 # ─── Thumbnail ─────────────────────────────────────────────────────
-USE_FFMPEG_THUMBNAIL = True
+USE_FFMPEG_THUMBNAIL = False
 FFMPEG_PATH = "ffmpeg"
 
 # ─── Logging ────────────────────────────────────────────────────────
