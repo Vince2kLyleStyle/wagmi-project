@@ -130,6 +130,40 @@ NICHE_PROFILES = {
         "emoji_pool": ["😂", "💀", "🤣", "😭", "🫠", "💀", "😮‍💨", "🤡", "👀", "🔥"],
     },
 
+    "brainrot": {
+        "caption_templates": [
+            "{emoji} normalize this",
+            "hear me out {emoji}",
+            "{emoji} no thoughts just vibes",
+            "why does this make sense {emoji}",
+            "the unserious energy is real {emoji}",
+            "{emoji} this is peak behavior",
+            "i refuse to be serious about this {emoji}",
+            "tell me why this is so real {emoji}",
+            "{emoji} rent free in my head",
+            "the bar is underground {emoji}",
+            "{emoji} i'm not even sorry",
+            "pov: you've given up being normal {emoji}",
+            "who else just exists {emoji}",
+            "{emoji} chronically online and proud",
+            "absolutely unhinged {emoji}",
+            "society peaked here {emoji}",
+            "{emoji} this is fine",
+            "we're all just npcs fr {emoji}",
+            "the delusion is immaculate {emoji}",
+            "{emoji} core memory unlocked",
+        ],
+        "hashtags": [
+            "#brainrot", "#absurd", "#unserious", "#humor", "#satire",
+            "#shitpost", "#chronicallyonline", "#memes", "#funny",
+            "#comedy", "#relatable", "#npc", "#delulu", "#chaotic",
+            "#peakcomedy", "#nothoughts", "#braindead", "#feral",
+            "#fyp", "#viral", "#foryou", "#explore",
+        ],
+        "hashtag_count": (3, 6),
+        "emoji_pool": ["💀", "🫠", "🧠", "🤡", "😭", "🗿", "👁️", "🫡", "😮‍💨", "🤌", "💅", "🦧"],
+    },
+
     "fitness": {
         "caption_templates": [
             "{emoji} no excuses",

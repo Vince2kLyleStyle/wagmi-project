@@ -7,29 +7,15 @@
         "warmup_intensity": "normal"
     },
     {
-        "niche": "gambling",
-        "username": "your_gambling_ig_account",
-        "password": "your_password",
-        "daily_cap": null,
-        "warmup_intensity": "normal"
-    },
-    {
-        "niche": "hustle",
-        "username": "your_hustle_ig_account",
-        "password": "your_password",
-        "daily_cap": null,
-        "warmup_intensity": "normal"
-    },
-    {
         "niche": "memes",
         "username": "your_memes_ig_account",
         "password": "your_password",
         "daily_cap": null,
-        "warmup_intensity": "full"
+        "warmup_intensity": "normal"
     },
     {
-        "niche": "fitness",
-        "username": "your_fitness_ig_account",
+        "niche": "brainrot",
+        "username": "your_brainrot_ig_account",
         "password": "your_password",
         "daily_cap": null,
         "warmup_intensity": "normal"
