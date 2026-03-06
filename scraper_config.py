@@ -57,14 +57,25 @@ NICHES = {
         "success motivation short", "money motivation edit",
     ],
     "memes": [
-        # Pure meme content (explore page gold)
+        # Non-copyright funny content — original/stock humor
         "funny memes compilation", "viral memes today",
         "tiktok memes compilation", "relatable memes",
         "gen z memes", "meme edit",
-        "caught in 4k", "unexpected memes",
         "no context memes", "random memes compilation",
-        "brainrot memes", "memes that hit different",
-        "send this to your friend",
+        "memes that hit different", "original funny videos",
+        "funny skits tiktok", "comedy tiktok original",
+        "funny reaction compilation", "unexpected memes",
+    ],
+    "brainrot": [
+        # Absurdist / unserious humor — faceless, shareable
+        "brainrot memes", "brainrot tiktok",
+        "absurd humor tiktok", "unserious tiktok",
+        "shitpost compilation", "chronically online memes",
+        "random facts funny", "weird facts tiktok",
+        "chaotic energy tiktok", "npc memes",
+        "delulu memes", "surreal memes compilation",
+        "absurdist comedy", "no thoughts just vibes",
+        "peak comedy tiktok", "feral memes",
     ],
     "fitness": [
         # Gym memes and edits
