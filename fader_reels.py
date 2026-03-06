@@ -268,9 +268,12 @@ def main() -> None:
     parser.add_argument("--session", "-s", default=None, help="Path to session.json")
     parser.add_argument("--skip-warmup", action="store_true", help="Skip warm-up phase")
     parser.add_argument("--daily-cap", type=int, default=None, help="Override daily cap")
+    parser.add_argument("--niche", "-n", default=None, help="Content niche subfolder (e.g. trading, gambling, hustle)")
     args = parser.parse_args()
 
     # Apply overrides
+    if args.niche:
+        config.VIDEO_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "tiktok_videos", args.niche)
     if args.username:
         config.USERNAME = args.username
         config.SESSION_FILE = os.path.join(config.SESSION_DIR, f"{args.username}_session.json")

@@ -110,18 +110,10 @@ def run_poster(accounts_by_niche, niches):
         cmd = [
             sys.executable, "fader_reels.py",
             "--username", acct["username"],
+            "--niche", niche,
         ]
 
-        # Override video_dir via config (temporary)
-        import config as ig_config
-        original_video_dir = ig_config.VIDEO_DIR
-        ig_config.VIDEO_DIR = niche_dir
-
-        try:
-            subprocess.run(cmd, cwd=os.path.dirname(__file__) or ".",
-                         env=env)
-        finally:
-            ig_config.VIDEO_DIR = original_video_dir
+        subprocess.run(cmd, cwd=os.path.dirname(__file__) or ".", env=env)
 
 
 def main():
