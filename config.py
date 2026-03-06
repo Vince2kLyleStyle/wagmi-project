@@ -1,75 +1,67 @@
 """
 Fader v2 — Configuration
 All tunables in one place.
+
+IMPORTANT: Daily limits are now managed by safety.py's progressive ramp-up
+system. The values here are FALLBACK MAXIMUMS only. The safety module will
+enforce lower limits for newer accounts automatically.
 """
 
 import os
 
 # ─── Account ────────────────────────────────────────────────────────
-USERNAME = os.getenv("IG_USERNAME", "dumbmoneyonsolana")
-PASSWORD = os.getenv("IG_PASSWORD", "InstagramPassword1")
+USERNAME = os.getenv("IG_USERNAME", "")
+PASSWORD = os.getenv("IG_PASSWORD", "")
 SESSION_DIR = os.path.join(os.path.dirname(__file__), "sessions")
-SESSION_FILE = os.path.join(SESSION_DIR, f"{USERNAME}_session.json")
+SESSION_FILE = os.path.join(SESSION_DIR, f"{USERNAME}_session.json") if USERNAME else ""
 
 # ─── Video Source ───────────────────────────────────────────────────
 VIDEO_DIR = os.path.join(os.path.dirname(__file__), "tiktok_videos", "trading")
 
+# ─── Niche (set by pipeline or manually) ────────────────────────────
+CURRENT_NICHE = os.getenv("IG_NICHE", "")
+
 # ─── Posting Limits ────────────────────────────────────────────────
-DAILY_MIN = 70         # minimum posts per day
-DAILY_MAX = 85         # hard cap per day (~2 per 25min × 18hrs)
-BATCH_SIZE = 2         # videos per mini-batch
+# These are FALLBACK values. The safety module calculates the real
+# daily limit based on account automation age.
+# Old values (70-85/day) were WAY too aggressive and triggered bans.
+DAILY_MIN = 8              # safe minimum for established accounts
+DAILY_MAX = 20             # hard cap (safety module may set lower)
+BATCH_SIZE = 1             # 1 video per batch — safer than 2
 
 # ─── Caption ──────────────────────────────────────────────────────
-# Captions — one is randomly picked for each upload
+# USE_SAME_CAPTION = False → uses niche_config.py's per-niche captions
+# USE_SAME_CAPTION = True → uses VIRAL_CAPTIONS below (legacy mode)
+USE_SAME_CAPTION = False
+
 VIRAL_CAPTIONS = [
-    (
-        "1997년 개봉한 영화 Titanic은 잭과 로즈의 운명적인 사랑을 통해 비극 속에서도 오래 남는 감정의 깊이를 보여주는 작품입니다. "
-        "화려한 연출보다 인물의 감정에 더 집중한 제임스 카메론 감독의 스타일은 지금 다시 봐도 묘하게 가슴을 울리죠. "
-        "배가 침몰하는 장면이 아닌, 두 사람이 서로를 바라보던 순간들이 더 강하게 기억에 남는 영화이기도 합니다. "
-        "이 감정을 완성해주는 곡이 바로 셀린 디온의 \"My Heart Will Go On\"입니다. "
-        "처음 들으면 잔잔한데, 어느 순간 자연스럽게 가슴이 벅차오르는 느낌을 줍니다. "
-        "특히 후반부의 고조되는 보컬은 영화 속 잭과 로즈의 마지막 장면과 겹쳐지면서 괜히 마음이 서늘해지기도 하고요. "
-        "많은 분들이 \"이 노래가 나오면 왜 그 장면이 자동으로 떠오르는지 모르겠다\"고 말하는데, 그만큼 영화와 음악이 자연스럽게 얽혀 있는 곡입니다. "
-        "1998년 아카데미 주제가상을 비롯해 여러 상을 휩쓴 건 단지 인기 때문만은 아닙니다. "
-        "누가 들어도 '한 시대의 감정'을 담고 있다는 게 느껴지고, 시간이 지나도 촌스러워지지 않는 힘이 있거든요. "
-        "오랜만에 다시 들으면, 괜히 조용한 밤에 혼자 영화 한 편을 끝낸 것 같은 기분이 듭니다. "
-        "흥미롭게도 이 노래는 처음부터 만들어진 게 아니에요. "
-        "제임스 호너가 영화 스코어를 작업하다가 엔딩 크레딧에 보컬 버전을 넣고 싶어해서 급히 만든 곡인데, "
-        "셀린 디온 본인은 데모를 듣고 \"별로 매력적이지 않다\"고 거절하려 했대요. "
-        "남편이자 매니저였던 르네 안젤릴이 설득해서 한 번만 녹음해보자고 해서 겨우 완성됐죠. "
-        "그런데 그 한 번의 녹음으로 역사적인 히트곡이 탄생한 거예요. "
-        "호너는 원래 노르웨이 가수 시셀을 염두에 뒀지만, 결국 디온의 목소리가 영화와 완벽하게 맞아떨어졌습니다. "
-        "이 노래는 단순히 타이타닉의 테마를 넘어, 사랑과 상실의 보편적인 감정을 상징하는 문화 아이콘이 됐어요. "
-        "1998년 그래미에서 올해의 레코드상과 올해의 노래상을 포함해 4관왕을 차지했고, "
-        "전 세계적으로 1,800만 장 이상 팔리며 디온의 시그니처 송이 됐죠. "
-        "최근에는 2025년 미국 의회도서관 국가 녹음 등록부에 등재되면서 '문화적으로 중요한 작품'으로 공식 인정받았습니다. "
-        "심지어 팬데믹 기간에는 이웃들을 위해 발코니에서 피아노로 연주하는 사람들도 있었고, "
-        "스포츠 하이라이트에 키 체인지 부분을 삽입하는 밈까지 생길 정도로 대중문화에 깊이 스며들었어요."
-        "\n#사실 #지식 #기술 #과학 #트렌드"
-    ),
-    (
-        "#Japan is turning footsteps into electricity! Using piezoelectric tiles, "
-        "every step you take generates a small amount of energy. Millions of steps "
-        "together can power LED lights and displays in busy places like Shibuya Station. "
-        "A brilliant way to create a sustainable and smart city \u2022 turning m..."
-    ),
+    # Legacy captions — only used if USE_SAME_CAPTION = True
+    # Prefer niche_config.py captions instead
 ]
-USE_SAME_CAPTION = True
 
 # ─── Timing (seconds) ──────────────────────────────────────────────
-# Between videos in a batch
-INTRA_BATCH_MIN = 30
-INTRA_BATCH_MAX = 90
+# These are FALLBACK values. The safety module provides dynamic gaps
+# based on account age.
+# Between videos in a batch (when BATCH_SIZE > 1)
+INTRA_BATCH_MIN = 60
+INTRA_BATCH_MAX = 180
 
-# Between batches (~25 min with jitter)
-INTER_BATCH_CENTER = 1500    # 25 min center
-INTER_BATCH_SPREAD = 420     # +/- 7 min std-dev (natural variation)
-INTER_BATCH_FLOOR = 900      # never less than 15 min
-INTER_BATCH_CEIL = 2400      # never more than 40 min
+# Between batches — now driven by safety.get_post_gap()
+# These fallbacks are only used if safety module is unavailable
+INTER_BATCH_CENTER = 2400    # 40 min center (was 25 — too fast)
+INTER_BATCH_SPREAD = 600     # +/- 10 min std-dev
+INTER_BATCH_FLOOR = 1200     # never less than 20 min
+INTER_BATCH_CEIL = 3600      # never more than 60 min
+
+# ─── Warm-up ──────────────────────────────────────────────────────
+# Intensity: "light", "normal", "full"
+# New/recently-flagged accounts should use "full"
+WARMUP_INTENSITY = "normal"
 
 # ─── Throttle / Error Handling ─────────────────────────────────────
-THROTTLE_SLEEP_MIN = 1800    # 30 min
-THROTTLE_SLEEP_MAX = 7200    # 120 min
+# Now managed by safety.py's cooldown system
+THROTTLE_SLEEP_MIN = 3600    # 60 min (was 30 — too aggressive)
+THROTTLE_SLEEP_MAX = 10800   # 3 hours (was 2 hours)
 
 # ─── Thumbnail ─────────────────────────────────────────────────────
 USE_FFMPEG_THUMBNAIL = False

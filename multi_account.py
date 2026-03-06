@@ -1,37 +1,28 @@
 """
-╔═══════════════════════════════════════════════════════════════╗
-║       FADER v2 — Multi-Account Rotation Runner               ║
-║   Cycles through multiple IG accounts for higher volume      ║
-╚═══════════════════════════════════════════════════════════════╝
+Fader v2 — Multi-Account Rotation Runner
+Cycles through multiple IG accounts with safety-managed limits per account.
 
 Usage:
     python multi_account.py
 
-Reads accounts from accounts.json (create it first — see example below).
-
 accounts.json format:
 [
     {
+        "niche": "trading",
         "username": "account1",
         "password": "pass1",
-        "video_dir": "tiktok_videos/account1",
-        "daily_cap": 10
+        "daily_cap": null,
+        "warmup_intensity": "normal"
     },
     {
+        "niche": "memes",
         "username": "account2",
-        "password": "pass2",
-        "video_dir": "tiktok_videos/account2",
-        "daily_cap": 12
+        "password": "pass2"
     }
 ]
 
-The runner will:
-  1. Pick the next account in rotation
-  2. Run a full daily session (warm-up → upload → daily cap → sleep)
-  3. Move to the next account
-  4. Repeat forever
-
-Press Ctrl+C to stop gracefully.
+daily_cap: null or omit → uses safety module's progressive limit
+warmup_intensity: "light", "normal", "full" (default: "normal")
 """
 
 import json
@@ -43,13 +34,13 @@ from datetime import datetime, timedelta
 
 import config
 import human_sim
+import safety
 from fader_reels import (
     create_client,
     relogin_client,
     upload_reel,
     log_success,
     countdown_timer,
-    gaussian_delay,
     get_video_queue,
 )
 
@@ -60,7 +51,7 @@ def load_accounts() -> list[dict]:
     """Load account list from accounts.json."""
     if not os.path.exists(ACCOUNTS_FILE):
         print(f"[!!] {ACCOUNTS_FILE} not found!")
-        print(f"[!!] Create it with your account credentials. See docstring for format.")
+        print(f"[!!] Create it with your account credentials. See accounts.example.json.")
         sys.exit(1)
 
     with open(ACCOUNTS_FILE, "r", encoding="utf-8") as f:
@@ -81,37 +72,58 @@ def run_account_session(acct: dict) -> int:
     """
     username = acct["username"]
     password = acct["password"]
-    video_dir = acct.get("video_dir", config.VIDEO_DIR)
-    daily_cap = acct.get("daily_cap", random.randint(config.DAILY_MIN, config.DAILY_MAX))
+    niche = acct.get("niche", "")
+    video_dir = acct.get("video_dir", os.path.join(
+        os.path.dirname(__file__), "tiktok_videos", niche
+    ) if niche else config.VIDEO_DIR)
+    warmup_intensity = acct.get("warmup_intensity", "normal")
+
+    # Get safe daily limit from safety module (or explicit override)
+    explicit_cap = acct.get("daily_cap")
+    if explicit_cap:
+        daily_cap = explicit_cap
+    else:
+        daily_cap = safety.get_daily_limit(username)
 
     # Override config for this account
     config.USERNAME = username
     config.PASSWORD = password
     config.VIDEO_DIR = video_dir
+    config.CURRENT_NICHE = niche
 
     session_file = os.path.join(config.SESSION_DIR, f"{username}_session.json")
 
     print(f"\n{'='*60}")
     print(f"  ACCOUNT: @{username}")
+    print(f"  Niche:     {niche or 'generic'}")
     print(f"  Video dir: {video_dir}")
-    print(f"  Daily cap: {daily_cap}")
+    print(f"  Daily cap: {daily_cap} (safety-managed)")
     print(f"{'='*60}\n")
+
+    # Safety pre-check
+    safety.print_account_status(username)
+    can, reason = safety.can_upload(username)
+    if not can:
+        print(f"[!!] Account @{username} blocked: {reason}")
+        print(f"[!!] Skipping this account.\n")
+        return 0
 
     # Login
     print(f"[*] Logging in as @{username}...")
     try:
-        cl = create_client(session_file)
+        cl = create_client(session_file, username)
     except Exception as e:
         print(f"[!!] Login failed for @{username}: {e}")
+        safety.record_failure(username, "login_failed")
         return 0
 
     # Warm-up
-    human_sim.warmup_session(cl)
+    human_sim.warmup_session(cl, intensity=warmup_intensity)
 
     # Load videos
-    import glob
+    import glob as globmod
     pattern = os.path.join(video_dir, "*.mp4")
-    videos = sorted(glob.glob(pattern))
+    videos = sorted(globmod.glob(pattern))
     if not videos:
         print(f"[!!] No videos found in {video_dir}, skipping account.")
         return 0
@@ -125,6 +137,17 @@ def run_account_session(acct: dict) -> int:
     total_batches = (min(daily_cap, total_videos) + config.BATCH_SIZE - 1) // config.BATCH_SIZE
 
     while video_idx < total_videos and uploads < daily_cap:
+        # Safety check before each upload
+        can, reason = safety.can_upload(username)
+        if not can:
+            if "Too soon" in reason:
+                gap = safety.get_post_gap(username)
+                countdown_timer(gap, "Safety gap")
+                continue
+            else:
+                print(f"[*] Safety stop for @{username}: {reason}")
+                break
+
         # Build batch
         batch_num += 1
         batch_end = min(video_idx + config.BATCH_SIZE, total_videos)
@@ -143,25 +166,26 @@ def run_account_session(acct: dict) -> int:
             human_sim.pre_upload_pause()
 
             print(f"\n  Uploading [{video_idx + 1}]: {filename}")
-            result = upload_reel(cl, vpath)
+            result = upload_reel(cl, vpath, niche=niche)
 
-            # Handle errors same as single-account mode
             if result == "THROTTLED":
-                sleep_sec = random.randint(config.THROTTLE_SLEEP_MIN, config.THROTTLE_SLEEP_MAX)
-                countdown_timer(sleep_sec, "Throttle cooldown")
-                result = upload_reel(cl, vpath)
+                safety.record_failure(username, "rate_limited")
+                print(f"  [!!] Rate limited — ending session for @{username}")
+                return uploads
 
             if result == "CHALLENGE":
-                print(f"  [!!] Challenge on @{username} — skipping rest of session.")
+                safety.record_failure(username, "challenge")
+                print(f"  [!!] Challenge on @{username} — ending session for safety.")
                 return uploads
 
             if result == "LOGIN_EXPIRED":
                 cl = relogin_client(cl, session_file)
-                result = upload_reel(cl, vpath)
+                result = upload_reel(cl, vpath, niche=niche)
 
             if result and result not in ("THROTTLED", "CHALLENGE", "LOGIN_EXPIRED"):
                 print(f"  [++] Successfully uploaded: {filename}")
-                log_success(filename, result)
+                log_success(filename, result, niche=niche)
+                safety.record_upload(username)
 
                 if config.DELETE_AFTER_UPLOAD:
                     try:
@@ -171,7 +195,8 @@ def run_account_session(acct: dict) -> int:
 
                 uploads += 1
                 human_sim.post_upload_pause()
-            else:
+            elif result is None:
+                safety.record_failure(username, "upload_failed")
                 print(f"  [!!] Failed: {filename}")
 
             video_idx += 1
@@ -183,17 +208,14 @@ def run_account_session(acct: dict) -> int:
         print(f"\n  Batch {batch_num} complete!")
 
         if video_idx < total_videos and uploads < daily_cap:
-            delay = gaussian_delay(
-                config.INTER_BATCH_CENTER,
-                config.INTER_BATCH_SPREAD,
-                config.INTER_BATCH_FLOOR,
-                config.INTER_BATCH_CEIL,
-            )
+            delay = safety.get_post_gap(username)
             mins, secs = divmod(delay, 60)
-            print(f"  Batch delay: {mins}m {secs}s")
-            countdown_timer(delay, "Batch delay")
+            print(f"  Safety-managed gap: {mins}m {secs}s")
+            human_sim.between_session_activity(cl)
+            countdown_timer(delay, "Post gap")
 
-    print(f"\n[*] @{username} session done — {uploads} uploads today.\n")
+    print(f"\n[*] @{username} session done — {uploads} uploads today.")
+    safety.print_account_status(username)
     return uploads
 
 
@@ -201,10 +223,26 @@ def main() -> None:
     print(r"""
     ╔═══════════════════════════════════════════════════════════╗
     ║    F A D E R  v2  —  Multi-Account Rotation Runner       ║
+    ║        Safety-First · Multi-Niche Edition                 ║
     ╚═══════════════════════════════════════════════════════════╝
     """)
 
     accounts = load_accounts()
+
+    # Show safety status for all accounts
+    print("\n  Account Safety Overview:")
+    print(f"  {'─'*50}")
+    for acct in accounts:
+        status = safety.get_account_status(acct["username"])
+        can, reason = status["can_upload"]
+        niche = acct.get("niche", "generic")
+        flag = "READY" if can else "BLOCKED"
+        print(f"  @{acct['username']:20s}  {niche:12s}  "
+              f"Day {status['days_automated']:3d}  "
+              f"{status['uploads_today']}/{status['daily_limit']} today  "
+              f"[{flag}]")
+    print(f"  {'─'*50}\n")
+
     cycle = 0
 
     try:
@@ -222,7 +260,7 @@ def main() -> None:
                 uploads = run_account_session(acct)
                 total_uploads += uploads
 
-                # Delay between accounts (look less suspicious)
+                # Delay between accounts
                 if idx < len(accounts) - 1:
                     gap = random.randint(600, 1800)  # 10-30 min
                     print(f"\n[*] Switching accounts in {gap // 60}m...")
@@ -230,7 +268,7 @@ def main() -> None:
 
             print(f"\n[*] Cycle {cycle} complete — {total_uploads} total uploads")
 
-            # Sleep until next day
+            # Sleep until next day (randomized morning start)
             now = datetime.now()
             tomorrow = (now + timedelta(days=1)).replace(
                 hour=random.randint(7, 11),

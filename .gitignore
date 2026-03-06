@@ -3,6 +3,10 @@ accounts.json
 sessions/
 *.session
 
+# Safety state (per-account tracking)
+sessions/safety/
+sessions/devices/
+
 # Downloaded videos
 tiktok_videos/
 
