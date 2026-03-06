@@ -1,7 +1,7 @@
 """
 Fader v2 — Instagram Reels Uploader
-Survival-optimized with progressive ramp-up, per-niche captions,
-and safety-driven rate limiting.
+Burst-mode posting: 3 reels with the same caption every ~30 min.
+Aggressive FYP strategy with per-niche captions.
 
 Usage:
     python fader_reels.py [--username USER] [--niche NICHE] [--session FILE]
@@ -171,13 +171,16 @@ def relogin_client(cl: Client, session_file: str) -> Client:
 
 # ─── Upload Logic ──────────────────────────────────────────────────
 
-def upload_reel(cl: Client, video_path: str, niche: str = "") -> str | None:
+def upload_reel(cl: Client, video_path: str, niche: str = "",
+                burst_caption: str = "") -> str | None:
     """
     Upload a single Reel. Returns the media ID on success, None on failure.
-    Uses niche-specific captions when available.
+    If burst_caption is provided, uses that (same caption for entire burst).
     """
-    # Pick caption based on niche
-    if config.USE_SAME_CAPTION and config.VIRAL_CAPTIONS:
+    # Use burst caption if provided (same across all 3 reels in a burst)
+    if burst_caption:
+        caption = burst_caption
+    elif config.USE_SAME_CAPTION and config.VIRAL_CAPTIONS:
         caption = random.choice(config.VIRAL_CAPTIONS)
     elif niche and niche in niche_config.NICHE_PROFILES:
         caption = niche_config.get_niche_caption(niche)
@@ -278,48 +281,42 @@ def main() -> None:
     session_file = args.session or config.SESSION_FILE
     warmup_intensity = args.warmup_intensity or config.WARMUP_INTENSITY
 
-    # Get safe daily limit from safety module
+    # Daily target
     if args.daily_cap:
         daily_cap = args.daily_cap
     else:
-        daily_cap = safety.get_daily_limit(config.USERNAME)
+        daily_cap = random.randint(config.DAILY_MIN, config.DAILY_MAX)
 
     # ─── Banner ─────────────────────────────────────────────────
     print(r"""
     ╔═══════════════════════════════════════════════╗
     ║     F A D E R  v2  —  Reels Uploader Bot     ║
-    ║       Safety-First · Multi-Niche Edition      ║
+    ║       Burst Mode · Multi-Niche Edition        ║
     ╚═══════════════════════════════════════════════╝
     """)
     print(f"  Account:    @{config.USERNAME}")
     print(f"  Niche:      {niche or 'generic'}")
-    print(f"  Daily cap:  {daily_cap} Reels (safety-managed)")
-    print(f"  Batch size: {config.BATCH_SIZE}")
-    print(f"  Caption:    {'legacy presets' if config.USE_SAME_CAPTION else f'niche: {niche}' if niche else 'randomized'}")
+    print(f"  Daily cap:  {daily_cap} Reels")
+    print(f"  Burst size: {config.BATCH_SIZE} reels every ~{config.INTER_BATCH_CENTER//60}min")
+    print(f"  Caption:    {'same per burst (' + niche + ')' if niche else 'legacy presets' if config.USE_SAME_CAPTION else 'randomized'}")
     print(f"  Video dir:  {config.VIDEO_DIR}")
     print(f"  Session:    {session_file}")
     print()
 
-    # ─── Safety Status ──────────────────────────────────────────
+    # ─── Account Status ─────────────────────────────────────────
     safety.print_account_status(config.USERNAME)
 
-    # ─── Pre-flight Safety Check ────────────────────────────────
+    # ─── Pre-flight: check for active IG error cooldown ─────────
     can, reason = safety.can_upload(config.USERNAME)
     if not can:
-        if "Daily limit" in reason:
-            print(f"[!!] {reason}")
-            print("[!!] Account has hit its safe daily limit. Exiting.")
-            sys.exit(0)
-        elif "Cooling down" in reason:
-            print(f"[!!] {reason}")
-            print("[!!] Waiting for cooldown to expire...")
-            # Wait for cooldown
-            state = safety._load_state(config.USERNAME)
-            if state.get("cooldown_until"):
-                cooldown_end = datetime.fromisoformat(state["cooldown_until"])
-                wait_sec = max(0, (cooldown_end - datetime.now()).total_seconds())
-                if wait_sec > 0:
-                    countdown_timer(int(wait_sec), "Cooldown")
+        print(f"[!!] {reason}")
+        print("[!!] Waiting for cooldown to expire...")
+        state = safety._load_state(config.USERNAME)
+        if state.get("cooldown_until"):
+            cooldown_end = datetime.fromisoformat(state["cooldown_until"])
+            wait_sec = max(0, (cooldown_end - datetime.now()).total_seconds())
+            if wait_sec > 0:
+                countdown_timer(int(wait_sec), "Cooldown")
 
     # ─── Login ──────────────────────────────────────────────────
     print("[*] Logging in...")
@@ -349,72 +346,85 @@ def main() -> None:
     video_idx = 0
     session_start = datetime.now()
 
-    # ─── Main Upload Loop ───────────────────────────────────────
+    # ─── Main Upload Loop (Burst Mode) ──────────────────────────
     while video_idx < total_videos:
-
-        # ── Safety check before each batch ─────────────────────
-        can, reason = safety.can_upload(config.USERNAME)
-        if not can:
-            if "Daily limit" in reason:
-                print(f"\n[*] Safety limit reached: {reason}")
-                break
-            elif "Too soon" in reason:
-                # Wait for the gap
-                gap = safety.get_post_gap(config.USERNAME)
-                print(f"\n[*] Safety gap: waiting {gap//60}min before next upload")
-                countdown_timer(gap, "Safety gap")
-                continue
-            elif "Cooling down" in reason:
-                print(f"\n[*] {reason}")
-                break
-            else:
-                print(f"\n[*] Safety block: {reason}")
-                break
 
         # ── Daily cap check ─────────────────────────────────────
         if uploads_today >= daily_cap:
+            # Sleep 5-7 hours then resume with new cap
+            sleep_hours = random.uniform(5, 7)
+            sleep_sec = int(sleep_hours * 3600)
+            wake_time = datetime.now() + timedelta(seconds=sleep_sec)
             print(f"\n{'='*60}")
             print(f"  DAILY CAP REACHED ({uploads_today}/{daily_cap})")
-            print(f"  Session complete. Exiting gracefully.")
+            print(f"  Sleeping {sleep_hours:.1f} hours")
+            print(f"  Waking at {wake_time.strftime('%H:%M:%S')}")
             print(f"{'='*60}\n")
-            break
+            countdown_timer(sleep_sec, "Sleep break")
 
-        # ── Build batch ─────────────────────────────────────────
+            uploads_today = 0
+            daily_cap = random.randint(config.DAILY_MIN, config.DAILY_MAX)
+            print(f"\n[*] New day — target: {daily_cap} uploads\n")
+            human_sim.warmup_session(cl, intensity=warmup_intensity)
+
+        # ── Check for IG error cooldown ─────────────────────────
+        can, reason = safety.can_upload(config.USERNAME)
+        if not can:
+            print(f"\n[*] {reason}")
+            state = safety._load_state(config.USERNAME)
+            if state.get("cooldown_until"):
+                cooldown_end = datetime.fromisoformat(state["cooldown_until"])
+                wait_sec = max(0, (cooldown_end - datetime.now()).total_seconds())
+                if wait_sec > 0:
+                    countdown_timer(int(wait_sec), "IG error cooldown")
+            continue
+
+        # ── Build burst ─────────────────────────────────────────
         batch_num += 1
         batch_end = min(video_idx + config.BATCH_SIZE, total_videos)
         batch_videos = videos[video_idx:batch_end]
 
+        # Generate ONE caption for this entire burst
+        if niche and niche in niche_config.NICHE_PROFILES:
+            burst_caption = niche_config.get_burst_caption(niche)
+        elif config.USE_SAME_CAPTION and config.VIRAL_CAPTIONS:
+            burst_caption = random.choice(config.VIRAL_CAPTIONS)
+        else:
+            burst_caption = captions.generate_caption()
+
         print(f"{'─'*60}")
-        print(f"  Batch {batch_num}/{total_batches}  |  "
+        print(f"  Burst {batch_num}/{total_batches}  |  "
               f"Day total: {uploads_today}/{daily_cap}  |  "
               f"Queue: {total_videos - video_idx} remaining")
+        print(f"  Caption: {burst_caption[:60]}...")
         print(f"{'─'*60}")
 
-        # ── Upload each video in batch ──────────────────────────
+        # ── Upload each video in burst (same caption) ───────────
         for i, vpath in enumerate(batch_videos):
             filename = os.path.basename(vpath)
 
             human_sim.pre_upload_pause()
 
             print(f"\n  Uploading [{video_idx + 1}/{total_videos}]: {filename}")
-            result = upload_reel(cl, vpath, niche=niche)
+            result = upload_reel(cl, vpath, niche=niche, burst_caption=burst_caption)
 
             if result == "THROTTLED":
                 safety.record_failure(config.USERNAME, "rate_limited")
-                print(f"  [!!] Rate limited — applying safety cooldown")
-                break
+                sleep_sec = random.randint(config.THROTTLE_SLEEP_MIN, config.THROTTLE_SLEEP_MAX)
+                print(f"  [!!] Rate limited — sleeping {sleep_sec//60}min then retry")
+                countdown_timer(sleep_sec, "Throttle cooldown")
+                result = upload_reel(cl, vpath, niche=niche, burst_caption=burst_caption)
 
             if result == "CHALLENGE":
                 safety.record_failure(config.USERNAME, "challenge")
-                print(f"  [!!] Challenge detected — stopping session for safety")
-                print(f"  [!!] You may need to manually verify on the app.")
-                # Don't retry — exit the session entirely
-                video_idx = total_videos  # break outer loop
-                break
+                print(f"  [!!] Challenge detected — pausing. Verify manually on the app.")
+                countdown_timer(7200, "Challenge pause")
+                cl = relogin_client(cl, session_file)
+                result = upload_reel(cl, vpath, niche=niche, burst_caption=burst_caption)
 
             if result == "LOGIN_EXPIRED":
                 cl = relogin_client(cl, session_file)
-                result = upload_reel(cl, vpath, niche=niche)
+                result = upload_reel(cl, vpath, niche=niche, burst_caption=burst_caption)
 
             if result and result not in ("THROTTLED", "CHALLENGE", "LOGIN_EXPIRED"):
                 print(f"  [++] Successfully uploaded: {filename}")
@@ -437,36 +447,39 @@ def main() -> None:
 
                 uploads_today += 1
                 human_sim.post_upload_pause()
-            elif result is None:
-                safety.record_failure(config.USERNAME, "upload_failed")
+            else:
                 print(f"  [!!] Failed to upload: {filename} (skipping)")
 
             video_idx += 1
 
-            # Intra-batch delay (not after last video in batch)
+            # Intra-burst delay (short — keep the burst tight)
             if i < len(batch_videos) - 1:
                 delay = random.randint(
                     config.INTRA_BATCH_MIN, config.INTRA_BATCH_MAX
                 )
-                countdown_timer(delay, "Intra-batch delay")
+                countdown_timer(delay, "Burst delay")
 
-            # Check daily cap mid-batch
             if uploads_today >= daily_cap:
                 break
 
-        # ── Batch complete ──────────────────────────────────────
-        print(f"\n  Batch {batch_num} complete!")
+        # ── Burst complete ──────────────────────────────────────
+        print(f"\n  Burst {batch_num} complete! ({len(batch_videos)} reels)")
 
-        # Inter-batch delay (use safety module's recommended gap)
+        # Inter-burst delay (~30 min with jitter)
         if video_idx < total_videos and uploads_today < daily_cap:
-            delay = safety.get_post_gap(config.USERNAME)
+            delay = gaussian_delay(
+                config.INTER_BATCH_CENTER,
+                config.INTER_BATCH_SPREAD,
+                config.INTER_BATCH_FLOOR,
+                config.INTER_BATCH_CEIL,
+            )
             mins, secs = divmod(delay, 60)
-            print(f"  Safety-managed gap: {mins}m {secs}s")
+            print(f"  Next burst in: {mins}m {secs}s")
 
-            # Mid-session organic activity during the wait
+            # Light mid-session activity during the wait
             human_sim.between_session_activity(cl)
 
-            countdown_timer(delay, "Post gap")
+            countdown_timer(delay, "Burst gap")
 
     # ─── Done ───────────────────────────────────────────────────
     elapsed = datetime.now() - session_start

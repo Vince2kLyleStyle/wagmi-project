@@ -2,9 +2,9 @@
 Fader v2 — Configuration
 All tunables in one place.
 
-IMPORTANT: Daily limits are now managed by safety.py's progressive ramp-up
-system. The values here are FALLBACK MAXIMUMS only. The safety module will
-enforce lower limits for newer accounts automatically.
+Strategy: 3-reel bursts every ~30 minutes with the same niche caption.
+Aggressive posting to hit FYP fast. Safety module only kicks in for
+actual Instagram errors (rate limits, challenges) — not for cadence.
 """
 
 import os
@@ -22,36 +22,33 @@ VIDEO_DIR = os.path.join(os.path.dirname(__file__), "tiktok_videos", "trading")
 CURRENT_NICHE = os.getenv("IG_NICHE", "")
 
 # ─── Posting Limits ────────────────────────────────────────────────
-# These are FALLBACK values. The safety module calculates the real
-# daily limit based on account automation age.
-# Old values (70-85/day) were WAY too aggressive and triggered bans.
-DAILY_MIN = 8              # safe minimum for established accounts
-DAILY_MAX = 20             # hard cap (safety module may set lower)
-BATCH_SIZE = 1             # 1 video per batch — safer than 2
+# Burst strategy: 3 reels per burst, every ~30 min
+# ~3 per 30min × 18hrs = ~108/day potential, but cap to keep sane
+DAILY_MIN = 70             # minimum posts per day
+DAILY_MAX = 90             # hard cap per day
+BATCH_SIZE = 3             # 3 reels per burst
 
 # ─── Caption ──────────────────────────────────────────────────────
 # USE_SAME_CAPTION = False → uses niche_config.py's per-niche captions
-# USE_SAME_CAPTION = True → uses VIRAL_CAPTIONS below (legacy mode)
+# Set to True + fill VIRAL_CAPTIONS to force one specific caption
 USE_SAME_CAPTION = False
 
 VIRAL_CAPTIONS = [
-    # Legacy captions — only used if USE_SAME_CAPTION = True
-    # Prefer niche_config.py captions instead
+    # Only used if USE_SAME_CAPTION = True
+    # Otherwise captions come from niche_config.py per niche
 ]
 
 # ─── Timing (seconds) ──────────────────────────────────────────────
-# These are FALLBACK values. The safety module provides dynamic gaps
-# based on account age.
-# Between videos in a batch (when BATCH_SIZE > 1)
-INTRA_BATCH_MIN = 60
-INTRA_BATCH_MAX = 180
+# Burst pattern: 3 reels with short gaps, then ~30 min wait
+# Between videos WITHIN a burst (keep it quick but not instant)
+INTRA_BATCH_MIN = 30         # 30s between reels in a burst
+INTRA_BATCH_MAX = 90         # 90s max
 
-# Between batches — now driven by safety.get_post_gap()
-# These fallbacks are only used if safety module is unavailable
-INTER_BATCH_CENTER = 2400    # 40 min center (was 25 — too fast)
-INTER_BATCH_SPREAD = 600     # +/- 10 min std-dev
-INTER_BATCH_FLOOR = 1200     # never less than 20 min
-INTER_BATCH_CEIL = 3600      # never more than 60 min
+# Between bursts (~30 min with jitter)
+INTER_BATCH_CENTER = 1800    # 30 min center
+INTER_BATCH_SPREAD = 300     # +/- 5 min std-dev
+INTER_BATCH_FLOOR = 1500     # never less than 25 min
+INTER_BATCH_CEIL = 2400      # never more than 40 min
 
 # ─── Warm-up ──────────────────────────────────────────────────────
 # Intensity: "light", "normal", "full"
@@ -59,9 +56,9 @@ INTER_BATCH_CEIL = 3600      # never more than 60 min
 WARMUP_INTENSITY = "normal"
 
 # ─── Throttle / Error Handling ─────────────────────────────────────
-# Now managed by safety.py's cooldown system
-THROTTLE_SLEEP_MIN = 3600    # 60 min (was 30 — too aggressive)
-THROTTLE_SLEEP_MAX = 10800   # 3 hours (was 2 hours)
+# Only kicks in when IG actually rate-limits or challenges
+THROTTLE_SLEEP_MIN = 1800    # 30 min
+THROTTLE_SLEEP_MAX = 3600    # 60 min
 
 # ─── Thumbnail ─────────────────────────────────────────────────────
 USE_FFMPEG_THUMBNAIL = False

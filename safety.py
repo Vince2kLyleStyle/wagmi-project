@@ -1,50 +1,28 @@
 """
-Fader v2 — Anti-Ban Safety Module
-Rate limiting, progressive ramp-up, session cooling, and action tracking
-to prevent Instagram from flagging accounts.
+Fader v2 — Session Tracker
+Tracks uploads per account for visibility. Does NOT gate or block uploads.
+The strategy is aggressive burst posting (3 reels every 30 min) to hit
+the FYP fast. If IG flags something, handle it manually.
 
-The #1 reason for phone verification / action blocks is posting too much
-too fast on a fresh or lightly-used account. This module enforces sane
-limits that scale up gradually as the account matures.
+This module provides:
+  - Per-account upload counting and stats
+  - Event logging (rate limits, challenges) for diagnostics
+  - Cooldowns ONLY for actual Instagram errors (rate limits, challenges)
+    NOT for normal posting cadence
 """
 
 import json
 import os
 import random
-import time
 from datetime import datetime, timedelta
 
 
-# ─── Account Age Tiers ──────────────────────────────────────────────
-# How many days old is the account's *automation history* (not creation date)?
-# We track when we first started posting from each account.
-# Limits ramp up over weeks, not hours.
-
-RAMP_UP_SCHEDULE = [
-    # (days_automated, max_daily_posts, min_gap_minutes, max_gap_minutes)
-    (0,   3,   90, 180),    # Day 0-2:   3 posts/day, 1.5-3hr gaps
-    (3,   5,   60, 120),    # Day 3-6:   5 posts/day, 1-2hr gaps
-    (7,   8,   45,  90),    # Week 1-2:  8 posts/day, 45-90min gaps
-    (14, 12,   35,  75),    # Week 2-3: 12 posts/day, 35-75min gaps
-    (21, 15,   25,  60),    # Week 3-4: 15 posts/day, 25-60min gaps
-    (30, 20,   20,  50),    # Month 1+: 20 posts/day, 20-50min gaps
-    (60, 25,   15,  40),    # Month 2+: 25 posts/day, 15-40min gaps
-]
-
-# Hard ceiling — never exceed this regardless of account age
-ABSOLUTE_MAX_DAILY = 25
-ABSOLUTE_MIN_GAP_MINUTES = 12
-
-# ─── Action Cooldowns ───────────────────────────────────────────────
-# After certain events, enforce mandatory cooldowns
-
+# ─── Cooldowns (only for actual IG errors, not posting cadence) ─────
 COOLDOWNS = {
-    "rate_limited":      (120, 240),   # 2-4 hours after rate limit
-    "challenge":         (360, 720),   # 6-12 hours after challenge
-    "feedback_required": (240, 480),   # 4-8 hours after feedback
-    "login_failed":      (60, 120),    # 1-2 hours after login failure
-    "upload_failed":     (10, 30),     # 10-30 min after upload failure
-    "consecutive_fails": (60, 180),    # 1-3 hours after 3+ consecutive failures
+    "rate_limited":      (30, 60),     # 30-60 min after rate limit
+    "challenge":         (120, 240),   # 2-4 hours after challenge
+    "feedback_required": (60, 120),    # 1-2 hours after feedback
+    "login_failed":      (15, 30),     # 15-30 min after login failure
 }
 
 # ─── Session State File ─────────────────────────────────────────────
@@ -87,46 +65,37 @@ def _days_automated(state: dict) -> int:
     return (datetime.now() - first).days
 
 
-def _get_tier(days: int) -> tuple:
-    """Return the ramp-up tier for the given number of days automated."""
-    tier = RAMP_UP_SCHEDULE[0]
-    for threshold, *params in RAMP_UP_SCHEDULE:
-        if days >= threshold:
-            tier = (threshold, *params)
-    return tier
-
-
 # ─── Public API ──────────────────────────────────────────────────────
 
 def get_daily_limit(username: str) -> int:
-    """Get the safe daily post limit for this account based on automation age."""
-    state = _load_state(username)
-    days = _days_automated(state)
-    _, max_daily, _, _ = _get_tier(days)
-    # Add slight randomness (±1-2) so it's not always the exact same number
-    jitter = random.randint(-1, 1)
-    limit = max(1, min(max_daily + jitter, ABSOLUTE_MAX_DAILY))
-    return limit
+    """
+    Return the daily post target. This is NOT a hard block — it's just
+    the target the bot aims for. Config drives it.
+    """
+    # Import here to avoid circular imports
+    import config
+    return random.randint(config.DAILY_MIN, config.DAILY_MAX)
 
 
 def get_post_gap(username: str) -> int:
-    """Get the minimum gap (seconds) between posts for this account."""
-    state = _load_state(username)
-    days = _days_automated(state)
-    _, _, min_gap_min, max_gap_min = _get_tier(days)
-    # Gaussian distribution centered between min and max
-    center = (min_gap_min + max_gap_min) / 2
-    spread = (max_gap_min - min_gap_min) / 4
-    gap_minutes = random.gauss(center, spread)
-    gap_minutes = max(max(min_gap_min, ABSOLUTE_MIN_GAP_MINUTES),
-                      min(max_gap_min, gap_minutes))
-    return int(gap_minutes * 60)
+    """
+    Return the gap between bursts (seconds).
+    Driven by config INTER_BATCH settings — the 30-min burst cadence.
+    """
+    import config
+    center = config.INTER_BATCH_CENTER
+    spread = config.INTER_BATCH_SPREAD
+    floor = config.INTER_BATCH_FLOOR
+    ceil = config.INTER_BATCH_CEIL
+    gap = random.gauss(center, spread)
+    gap = max(floor, min(ceil, gap))
+    return int(gap)
 
 
 def can_upload(username: str) -> tuple[bool, str]:
     """
-    Check if it's safe to upload right now.
-    Returns (can_upload, reason_if_not).
+    Check if there's an active cooldown from an Instagram error.
+    Normal posting cadence is NOT gated — only actual IG errors trigger blocks.
     """
     state = _load_state(username)
     today = datetime.now().strftime("%Y-%m-%d")
@@ -136,35 +105,15 @@ def can_upload(username: str) -> tuple[bool, str]:
         state["uploads_today"] = 0
         state["today_date"] = today
         state["consecutive_failures"] = 0
+        state["cooldown_until"] = None
         _save_state(username, state)
 
-    # Check cooldown
+    # Only check cooldown from actual IG errors
     if state.get("cooldown_until"):
         cooldown_end = datetime.fromisoformat(state["cooldown_until"])
         if datetime.now() < cooldown_end:
             remaining = (cooldown_end - datetime.now()).total_seconds()
-            return False, f"Cooling down — {remaining/60:.0f}min remaining"
-
-    # Check daily limit
-    days = _days_automated(state)
-    _, max_daily, _, _ = _get_tier(days)
-    limit = min(max_daily, ABSOLUTE_MAX_DAILY)
-
-    if state["uploads_today"] >= limit:
-        return False, f"Daily limit reached ({state['uploads_today']}/{limit})"
-
-    # Check minimum gap since last upload
-    if state.get("last_upload_time"):
-        last = datetime.fromisoformat(state["last_upload_time"])
-        elapsed = (datetime.now() - last).total_seconds()
-        min_gap = ABSOLUTE_MIN_GAP_MINUTES * 60
-        if elapsed < min_gap:
-            wait = min_gap - elapsed
-            return False, f"Too soon since last upload — wait {wait/60:.0f}min"
-
-    # Check consecutive failures
-    if state["consecutive_failures"] >= 3:
-        return False, "3+ consecutive failures — session may be flagged"
+            return False, f"Cooling down — {remaining/60:.0f}min remaining (IG error)"
 
     return True, "OK"
 
@@ -189,7 +138,7 @@ def record_upload(username: str) -> None:
 
 
 def record_failure(username: str, failure_type: str = "upload_failed") -> None:
-    """Record a failed upload or error event."""
+    """Record a failed upload or IG error. Only applies cooldown for real IG errors."""
     state = _load_state(username)
     state["consecutive_failures"] = state.get("consecutive_failures", 0) + 1
 
@@ -199,42 +148,34 @@ def record_failure(username: str, failure_type: str = "upload_failed") -> None:
         "type": failure_type,
         "time": datetime.now().isoformat(),
     })
-    # Keep only last 50 events
     state["events"] = events[-50:]
 
-    # Apply cooldown based on failure type
+    # Apply cooldown ONLY for actual IG errors (not generic upload failures)
     if failure_type in COOLDOWNS:
         min_cd, max_cd = COOLDOWNS[failure_type]
         cooldown_min = random.randint(min_cd, max_cd)
         state["cooldown_until"] = (
             datetime.now() + timedelta(minutes=cooldown_min)
         ).isoformat()
-        print(f"  [safety] Cooldown applied: {cooldown_min}min ({failure_type})")
-
-    # Extra cooldown for consecutive failures
-    if state["consecutive_failures"] >= 3 and failure_type != "consecutive_fails":
-        min_cd, max_cd = COOLDOWNS["consecutive_fails"]
-        cooldown_min = random.randint(min_cd, max_cd)
-        state["cooldown_until"] = (
-            datetime.now() + timedelta(minutes=cooldown_min)
-        ).isoformat()
-        print(f"  [safety] Extended cooldown: {cooldown_min}min (consecutive failures)")
+        print(f"  [safety] Cooldown: {cooldown_min}min ({failure_type})")
 
     _save_state(username, state)
 
 
 def get_account_status(username: str) -> dict:
-    """Get a human-readable status summary for an account."""
+    """Get a status summary for an account."""
     state = _load_state(username)
     days = _days_automated(state)
-    _, max_daily, min_gap, max_gap = _get_tier(days)
+
+    import config
+    daily_limit = random.randint(config.DAILY_MIN, config.DAILY_MAX)
 
     return {
         "username": username,
         "days_automated": days,
-        "tier": f"Day {days} — max {max_daily}/day, {min_gap}-{max_gap}min gaps",
+        "tier": f"Burst mode — {config.BATCH_SIZE} reels every ~{config.INTER_BATCH_CENTER//60}min",
         "uploads_today": state.get("uploads_today", 0),
-        "daily_limit": min(max_daily, ABSOLUTE_MAX_DAILY),
+        "daily_limit": daily_limit,
         "total_uploads": state.get("total_uploads", 0),
         "consecutive_failures": state.get("consecutive_failures", 0),
         "cooldown_until": state.get("cooldown_until"),
@@ -243,17 +184,17 @@ def get_account_status(username: str) -> dict:
 
 
 def print_account_status(username: str) -> None:
-    """Print a formatted account safety status."""
+    """Print a formatted account status."""
     s = get_account_status(username)
     print(f"\n  {'─'*50}")
-    print(f"  Safety Status: @{s['username']}")
+    print(f"  Status: @{s['username']}")
     print(f"  {'─'*50}")
-    print(f"  Automation age: {s['days_automated']} days")
-    print(f"  Tier:           {s['tier']}")
-    print(f"  Today:          {s['uploads_today']}/{s['daily_limit']} uploads")
+    print(f"  Running for:    {s['days_automated']} days")
+    print(f"  Mode:           {s['tier']}")
+    print(f"  Today:          {s['uploads_today']} uploads")
     print(f"  All-time:       {s['total_uploads']} uploads")
     can, reason = s["can_upload"]
-    status = "READY" if can else f"BLOCKED — {reason}"
+    status = "READY" if can else f"PAUSED — {reason}"
     print(f"  Status:         {status}")
     if s["cooldown_until"]:
         print(f"  Cooldown until: {s['cooldown_until']}")

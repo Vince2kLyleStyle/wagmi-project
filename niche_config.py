@@ -160,7 +160,6 @@ def get_niche_caption(niche: str) -> str:
     """Generate a caption for the given niche with emojis and hashtags."""
     profile = NICHE_PROFILES.get(niche)
     if not profile:
-        # Fallback to generic
         profile = NICHE_PROFILES.get("memes", list(NICHE_PROFILES.values())[0])
 
     template = random.choice(profile["caption_templates"])
@@ -173,6 +172,15 @@ def get_niche_caption(niche: str) -> str:
     caption = template.replace("{emoji}", emoji)
     caption = f"{caption}\n.\n.\n{' '.join(tags)}"
     return caption
+
+
+def get_burst_caption(niche: str) -> str:
+    """
+    Generate ONE caption to be reused across an entire burst (3 reels).
+    Same caption per burst = consistent presence in the algorithm.
+    Call this once per burst, then pass the result to each upload.
+    """
+    return get_niche_caption(niche)
 
 
 def list_niches() -> list[str]:

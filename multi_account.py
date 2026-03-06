@@ -78,12 +78,12 @@ def run_account_session(acct: dict) -> int:
     ) if niche else config.VIDEO_DIR)
     warmup_intensity = acct.get("warmup_intensity", "normal")
 
-    # Get safe daily limit from safety module (or explicit override)
+    # Daily target
     explicit_cap = acct.get("daily_cap")
     if explicit_cap:
         daily_cap = explicit_cap
     else:
-        daily_cap = safety.get_daily_limit(username)
+        daily_cap = random.randint(config.DAILY_MIN, config.DAILY_MAX)
 
     # Override config for this account
     config.USERNAME = username
@@ -97,14 +97,15 @@ def run_account_session(acct: dict) -> int:
     print(f"  ACCOUNT: @{username}")
     print(f"  Niche:     {niche or 'generic'}")
     print(f"  Video dir: {video_dir}")
-    print(f"  Daily cap: {daily_cap} (safety-managed)")
+    print(f"  Daily cap: {daily_cap}")
+    print(f"  Burst:     {config.BATCH_SIZE} reels every ~{config.INTER_BATCH_CENTER//60}min")
     print(f"{'='*60}\n")
 
-    # Safety pre-check
+    # Check for active IG error cooldown
     safety.print_account_status(username)
     can, reason = safety.can_upload(username)
     if not can:
-        print(f"[!!] Account @{username} blocked: {reason}")
+        print(f"[!!] @{username}: {reason}")
         print(f"[!!] Skipping this account.\n")
         return 0
 
@@ -136,26 +137,31 @@ def run_account_session(acct: dict) -> int:
     batch_num = 0
     total_batches = (min(daily_cap, total_videos) + config.BATCH_SIZE - 1) // config.BATCH_SIZE
 
+    import niche_config as nc
+
     while video_idx < total_videos and uploads < daily_cap:
-        # Safety check before each upload
+        # Check for IG error cooldown
         can, reason = safety.can_upload(username)
         if not can:
-            if "Too soon" in reason:
-                gap = safety.get_post_gap(username)
-                countdown_timer(gap, "Safety gap")
-                continue
-            else:
-                print(f"[*] Safety stop for @{username}: {reason}")
-                break
+            print(f"[*] @{username}: {reason} — ending session")
+            break
 
-        # Build batch
+        # Build burst
         batch_num += 1
         batch_end = min(video_idx + config.BATCH_SIZE, total_videos)
         batch_videos = videos[video_idx:batch_end]
 
+        # Same caption for entire burst
+        if niche and niche in nc.NICHE_PROFILES:
+            burst_caption = nc.get_burst_caption(niche)
+        else:
+            from captions import generate_caption
+            burst_caption = generate_caption()
+
         print(f"\n{'─'*60}")
-        print(f"  @{username} — Batch {batch_num}/{total_batches}  |  "
+        print(f"  @{username} — Burst {batch_num}/{total_batches}  |  "
               f"Uploaded: {uploads}/{daily_cap}")
+        print(f"  Caption: {burst_caption[:60]}...")
         print(f"{'─'*60}")
 
         for i, vpath in enumerate(batch_videos):
@@ -166,21 +172,23 @@ def run_account_session(acct: dict) -> int:
             human_sim.pre_upload_pause()
 
             print(f"\n  Uploading [{video_idx + 1}]: {filename}")
-            result = upload_reel(cl, vpath, niche=niche)
+            result = upload_reel(cl, vpath, niche=niche, burst_caption=burst_caption)
 
             if result == "THROTTLED":
                 safety.record_failure(username, "rate_limited")
-                print(f"  [!!] Rate limited — ending session for @{username}")
-                return uploads
+                sleep_sec = random.randint(config.THROTTLE_SLEEP_MIN, config.THROTTLE_SLEEP_MAX)
+                print(f"  [!!] Rate limited — sleeping {sleep_sec//60}min then retry")
+                countdown_timer(sleep_sec, "Throttle cooldown")
+                result = upload_reel(cl, vpath, niche=niche, burst_caption=burst_caption)
 
             if result == "CHALLENGE":
                 safety.record_failure(username, "challenge")
-                print(f"  [!!] Challenge on @{username} — ending session for safety.")
+                print(f"  [!!] Challenge on @{username} — ending session.")
                 return uploads
 
             if result == "LOGIN_EXPIRED":
                 cl = relogin_client(cl, session_file)
-                result = upload_reel(cl, vpath, niche=niche)
+                result = upload_reel(cl, vpath, niche=niche, burst_caption=burst_caption)
 
             if result and result not in ("THROTTLED", "CHALLENGE", "LOGIN_EXPIRED"):
                 print(f"  [++] Successfully uploaded: {filename}")
@@ -195,24 +203,31 @@ def run_account_session(acct: dict) -> int:
 
                 uploads += 1
                 human_sim.post_upload_pause()
-            elif result is None:
-                safety.record_failure(username, "upload_failed")
+            else:
                 print(f"  [!!] Failed: {filename}")
 
             video_idx += 1
 
+            # Short delay within burst
             if i < len(batch_videos) - 1 and uploads < daily_cap:
                 delay = random.randint(config.INTRA_BATCH_MIN, config.INTRA_BATCH_MAX)
-                countdown_timer(delay, "Intra-batch delay")
+                countdown_timer(delay, "Burst delay")
 
-        print(f"\n  Batch {batch_num} complete!")
+        print(f"\n  Burst {batch_num} complete!")
 
+        # ~30 min gap between bursts
         if video_idx < total_videos and uploads < daily_cap:
-            delay = safety.get_post_gap(username)
+            from fader_reels import gaussian_delay
+            delay = gaussian_delay(
+                config.INTER_BATCH_CENTER,
+                config.INTER_BATCH_SPREAD,
+                config.INTER_BATCH_FLOOR,
+                config.INTER_BATCH_CEIL,
+            )
             mins, secs = divmod(delay, 60)
-            print(f"  Safety-managed gap: {mins}m {secs}s")
+            print(f"  Next burst in: {mins}m {secs}s")
             human_sim.between_session_activity(cl)
-            countdown_timer(delay, "Post gap")
+            countdown_timer(delay, "Burst gap")
 
     print(f"\n[*] @{username} session done — {uploads} uploads today.")
     safety.print_account_status(username)
@@ -223,7 +238,7 @@ def main() -> None:
     print(r"""
     ╔═══════════════════════════════════════════════════════════╗
     ║    F A D E R  v2  —  Multi-Account Rotation Runner       ║
-    ║        Safety-First · Multi-Niche Edition                 ║
+    ║        Burst Mode · Multi-Niche Edition                   ║
     ╚═══════════════════════════════════════════════════════════╝
     """)
 
