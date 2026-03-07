@@ -41,6 +41,12 @@ NICHES = {
         "luxury lifestyle", "rich lifestyle", "millionaire mindset",
         "grindset", "entrepreneur motivation", "sigma male",
     ],
+    "brainrot": [
+        "brainrot", "skibidi", "NPC tiktok", "ohio meme",
+        "rizz", "sigma edit", "fanum tax", "gyatt",
+        "italian brainrot", "brainrot compilation", "brainrot funny",
+        "subway surfers brainrot", "minecraft brainrot",
+    ],
 }
 MAX_VIDEOS_PER_KEYWORD = 50            # Videos to collect per keyword
 MIN_VIEWS = 0                          # Minimum view count (0 = no filter)
