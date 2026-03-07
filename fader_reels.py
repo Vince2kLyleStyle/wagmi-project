@@ -268,12 +268,35 @@ def main() -> None:
     parser.add_argument("--session", "-s", default=None, help="Path to session.json")
     parser.add_argument("--skip-warmup", action="store_true", help="Skip warm-up phase")
     parser.add_argument("--daily-cap", type=int, default=None, help="Override daily cap")
+    parser.add_argument("--niche", "-n", default=None, help="Content niche subfolder (e.g. trading, gambling, hustle)")
     args = parser.parse_args()
 
     # Apply overrides
+    if args.niche:
+        config.VIDEO_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "tiktok_videos", args.niche)
     if args.username:
         config.USERNAME = args.username
+        config.PASSWORD = os.getenv("IG_PASSWORD", config.PASSWORD)
         config.SESSION_FILE = os.path.join(config.SESSION_DIR, f"{args.username}_session.json")
+    elif args.niche:
+        # Auto-load account from accounts.json when --niche is given without --username
+        accounts_file = os.path.join(os.path.dirname(os.path.abspath(__file__)), "accounts.json")
+        if os.path.exists(accounts_file):
+            try:
+                with open(accounts_file, encoding="utf-8") as f:
+                    accts_by_niche = {a["niche"]: a for a in json.load(f)}
+            except json.JSONDecodeError as e:
+                print(f"  [!!] accounts.json has a syntax error: {e}")
+                print(f"  [!!] Open accounts.json and check for smart quotes, trailing commas, or missing brackets.")
+                sys.exit(1)
+            if args.niche in accts_by_niche:
+                acct = accts_by_niche[args.niche]
+                config.USERNAME = acct["username"]
+                config.PASSWORD = acct["password"]
+                config.SESSION_FILE = os.path.join(config.SESSION_DIR, f"{acct['username']}_session.json")
+                if acct.get("daily_cap") is not None:
+                    config.DAILY_MAX = acct["daily_cap"]
+                    config.DAILY_MIN = min(config.DAILY_MIN, acct["daily_cap"])
     session_file = args.session or config.SESSION_FILE
     daily_cap = args.daily_cap or random.randint(config.DAILY_MIN, config.DAILY_MAX)
 

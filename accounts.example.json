@@ -16,5 +16,11 @@
         "username": "your_hustle_ig_account",
         "password": "your_password",
         "daily_cap": 10
+    },
+    {
+        "niche": "brainrot",
+        "username": "your_brainrot_ig_account",
+        "password": "your_password",
+        "daily_cap": 10
     }
 ]
