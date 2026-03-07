@@ -282,8 +282,13 @@ def main() -> None:
         # Auto-load account from accounts.json when --niche is given without --username
         accounts_file = os.path.join(os.path.dirname(os.path.abspath(__file__)), "accounts.json")
         if os.path.exists(accounts_file):
-            with open(accounts_file) as f:
-                accts_by_niche = {a["niche"]: a for a in json.load(f)}
+            try:
+                with open(accounts_file, encoding="utf-8") as f:
+                    accts_by_niche = {a["niche"]: a for a in json.load(f)}
+            except json.JSONDecodeError as e:
+                print(f"  [!!] accounts.json has a syntax error: {e}")
+                print(f"  [!!] Open accounts.json and check for smart quotes, trailing commas, or missing brackets.")
+                sys.exit(1)
             if args.niche in accts_by_niche:
                 acct = accts_by_niche[args.niche]
                 config.USERNAME = acct["username"]
