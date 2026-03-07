@@ -294,7 +294,7 @@ def main() -> None:
                 config.USERNAME = acct["username"]
                 config.PASSWORD = acct["password"]
                 config.SESSION_FILE = os.path.join(config.SESSION_DIR, f"{acct['username']}_session.json")
-                if "daily_cap" in acct:
+                if acct.get("daily_cap") is not None:
                     config.DAILY_MAX = acct["daily_cap"]
                     config.DAILY_MIN = min(config.DAILY_MIN, acct["daily_cap"])
     session_file = args.session or config.SESSION_FILE
