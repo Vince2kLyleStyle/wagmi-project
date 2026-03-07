@@ -276,7 +276,22 @@ def main() -> None:
         config.VIDEO_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "tiktok_videos", args.niche)
     if args.username:
         config.USERNAME = args.username
+        config.PASSWORD = os.getenv("IG_PASSWORD", config.PASSWORD)
         config.SESSION_FILE = os.path.join(config.SESSION_DIR, f"{args.username}_session.json")
+    elif args.niche:
+        # Auto-load account from accounts.json when --niche is given without --username
+        accounts_file = os.path.join(os.path.dirname(os.path.abspath(__file__)), "accounts.json")
+        if os.path.exists(accounts_file):
+            with open(accounts_file) as f:
+                accts_by_niche = {a["niche"]: a for a in json.load(f)}
+            if args.niche in accts_by_niche:
+                acct = accts_by_niche[args.niche]
+                config.USERNAME = acct["username"]
+                config.PASSWORD = acct["password"]
+                config.SESSION_FILE = os.path.join(config.SESSION_DIR, f"{acct['username']}_session.json")
+                if "daily_cap" in acct:
+                    config.DAILY_MAX = acct["daily_cap"]
+                    config.DAILY_MIN = min(config.DAILY_MIN, acct["daily_cap"])
     session_file = args.session or config.SESSION_FILE
     daily_cap = args.daily_cap or random.randint(config.DAILY_MIN, config.DAILY_MAX)
 
