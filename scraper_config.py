@@ -7,15 +7,8 @@ import os
 
 # ─── TikTok Search ────────────────────────────────────────────────────
 KEYWORDS = [                           # Default keywords (used when no niche specified)
-    "trading", "trading lifestyle", "trader motivation",
-    "forex", "forex lifestyle", "forex gains",
-    "stocks", "stock market", "stock trading",
-    "crypto trading", "crypto gains", "bitcoin trading",
-    "day trading", "day trader lifestyle",
-    "gambling", "gambling wins", "casino wins",
-    "wolf of wall street", "hustle motivation",
-    "hustle", "TJR", "money motivation",
-    "luxury lifestyle", "rich lifestyle",
+    "jester maxxing", "clavicular", "TJR", "brainrot",
+    "togi", "clav", "crypto", "wolf of wall street",
 ]
 
 # ─── Niche Presets ────────────────────────────────────────────────────
@@ -23,27 +16,13 @@ KEYWORDS = [                           # Default keywords (used when no niche sp
 # and ultimately to its own Instagram account.
 # Add new niches here — the pipeline and scraper will auto-detect them.
 NICHES = {
-    "trading": [
-        "trading", "trading lifestyle", "trader motivation",
-        "forex", "forex lifestyle", "forex gains",
-        "stocks", "stock market", "stock trading",
-        "crypto trading", "crypto gains", "bitcoin trading",
-        "day trading", "day trader lifestyle",
-        "wolf of wall street", "TJR",
-    ],
-    "gambling": [
-        "gambling", "gambling wins", "casino wins",
-        "slot machine wins", "poker highlights", "sports betting wins",
-        "blackjack", "roulette wins",
-    ],
-    "hustle": [
-        "hustle", "hustle motivation", "money motivation",
-        "luxury lifestyle", "rich lifestyle", "millionaire mindset",
-        "grindset", "entrepreneur motivation", "sigma male",
+    "memes": [
+        "jester maxxing", "clavicular", "TJR", "brainrot",
+        "togi", "clav", "crypto", "wolf of wall street",
     ],
 }
 MAX_VIDEOS_PER_KEYWORD = 50            # Videos to collect per keyword
-MIN_VIEWS = 0                          # Minimum view count (0 = no filter)
+MIN_VIEWS = 500_000                    # Minimum view count — only high quality content
 MIN_LIKES = 0                          # Minimum like count (0 = no filter)
 SCROLL_COUNT = 10                      # Times to scroll for more results
 HEADLESS = True                        # Run browser without GUI
