@@ -9,10 +9,8 @@ load_dotenv()
 
 # ─── TikTok Search ────────────────────────────────────────────────────
 KEYWORDS = [                           # Default keywords (used when no niche specified)
-    "brainrot", "skibidi", "italian brainrot",
-    "funny edit compilation", "shitpost status",
-    "meme compilation", "perfectly cut screams",
-    "sigma grindset", "hood irony", "cursed videos",
+    "TJR", "TJR edit", "wolf of wall street meme",
+    "sigma grindset", "hustle meme", "crypto meme",
 ]
 
 # ─── Niche Presets ────────────────────────────────────────────────────
@@ -21,26 +19,13 @@ KEYWORDS = [                           # Default keywords (used when no niche sp
 # Add new niches here — the pipeline and scraper will auto-detect them.
 NICHES = {
     "memes": [
-        # Brainrot / absurdist
-        "brainrot", "tungtungtung", "skibidi", "italian brainrot",
-        "bombardiro crocodilo", "tralalero tralala",
-        # Looksmaxxing / self-improvement parody
-        "jester maxxing", "maxxing", "mogging", "mewing",
-        "clavicular", "clav", "looksmaxxing",
-        # Funny edits / relatable
-        "funny edit compilation", "shitpost status",
-        "meme compilation", "perfectly cut screams",
-        "unexpected meme", "wait for it funny",
-        # Trending formats
-        "POV meme", "real vs expectation",
-        "bro thinks he's", "that one friend who",
-        "me when", "nobody absolutely nobody",
-        # Finance/hustle memes
-        "crypto meme", "wolf of wall street meme",
-        "sigma grindset", "hustle meme",
-        # Misc viral
-        "TJR", "togi", "hood irony",
-        "cursed videos", "unhinged memes",
+        # Core — proven performers
+        "TJR", "TJR edit", "TJR meme",
+        "wolf of wall street", "wolf of wall street meme",
+        "wolf of wall street edit", "jordan belfort meme",
+        # Adjacent sigma/hustle (same audience)
+        "sigma grindset", "sigma edit", "hustle meme",
+        "crypto meme", "trading meme",
     ],
 }
 MAX_VIDEOS_PER_KEYWORD = 50            # Videos to collect per keyword
