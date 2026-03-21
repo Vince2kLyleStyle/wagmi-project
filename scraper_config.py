@@ -4,6 +4,8 @@ All tunables in one place.
 """
 
 import os
+from dotenv import load_dotenv
+load_dotenv()
 
 # ─── TikTok Search ────────────────────────────────────────────────────
 KEYWORDS = [                           # Default keywords (used when no niche specified)

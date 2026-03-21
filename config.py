@@ -4,6 +4,8 @@ All tunables in one place.
 """
 
 import os
+from dotenv import load_dotenv
+load_dotenv()
 
 # ─── Account ────────────────────────────────────────────────────────
 USERNAME = os.getenv("IG_USERNAME", "dumbmoneyonsolana")
