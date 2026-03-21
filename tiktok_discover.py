@@ -82,7 +82,7 @@ def login_to_tiktok():
 
 
 def scrape_tiktok(keywords, max_per_keyword=20, min_views=0, min_likes=0,
-                  scroll_count=5, headless=True):
+                  scroll_count=5, headless=True, min_engagement_ratio=0.0):
     """
     Scrape TikTok search results for given keywords.
 
@@ -148,7 +148,7 @@ def scrape_tiktok(keywords, max_per_keyword=20, min_views=0, min_likes=0,
                 prev_count = cur_count
 
             # Extract video links and metadata
-            videos = _extract_videos(page, keyword, min_views, min_likes)
+            videos = _extract_videos(page, keyword, min_views, min_likes, min_engagement_ratio)
 
             new_count = 0
             for vid in videos:
@@ -186,7 +186,7 @@ def scrape_tiktok(keywords, max_per_keyword=20, min_views=0, min_likes=0,
                                 stale_scrolls = 0
                             prev_count = cur_count
 
-                        liked_videos = _extract_videos(page, keyword, min_views, min_likes)
+                        liked_videos = _extract_videos(page, keyword, min_views, min_likes, min_engagement_ratio)
                         for vid in liked_videos:
                             if vid["url"] not in seen_urls and new_count < max_per_keyword:
                                 seen_urls.add(vid["url"])
@@ -221,8 +221,8 @@ def _dismiss_popups(page):
             pass
 
 
-def _extract_videos(page, keyword, min_views, min_likes):
-    """Extract video URLs and view counts from the current page."""
+def _extract_videos(page, keyword, min_views, min_likes, min_engagement_ratio=0.0):
+    """Extract video URLs, view counts, likes, and shares from the current page."""
     results = []
     seen_ids = set()
 
@@ -287,12 +287,12 @@ def _extract_videos(page, keyword, min_views, min_likes):
 
     print(f"   🔗  Found {len(seen_ids)} unique video IDs")
 
-    # Now try to get view counts for each video
-    view_counts = {}
+    # Now try to get view counts, likes, and shares for each video
+    video_stats = {}  # {video_id: {"views": int, "likes": int, "shares": int}}
 
     # Strategy A: Extract from embedded JSON data (most reliable)
     try:
-        view_data = page.evaluate("""() => {
+        stats_data = page.evaluate("""() => {
             const data = {};
             // Try window globals that TikTok uses to hydrate the page
             for (const key of ['__UNIVERSAL_DATA_FOR_REHYDRATION__', 'SIGI_STATE', '__NEXT_DATA__']) {
@@ -305,13 +305,23 @@ def _extract_videos(page, keyword, min_views, min_likes):
                         const vidId = m[1];
                         const idx = str.indexOf('"' + vidId + '"');
                         if (idx === -1) continue;
-                        const chunk = str.substring(idx, idx + 800);
+                        const chunk = str.substring(idx, idx + 1200);
                         const pc = chunk.match(/"playCount"\\s*[:]\\s*"?(\\d+)"?/);
-                        if (pc) data[vidId] = pc[1];
+                        const dc = chunk.match(/"diggCount"\\s*[:]\\s*"?(\\d+)"?/);
+                        const sc = chunk.match(/"shareCount"\\s*[:]\\s*"?(\\d+)"?/);
+                        const cc = chunk.match(/"commentCount"\\s*[:]\\s*"?(\\d+)"?/);
+                        if (pc || dc) {
+                            data[vidId] = {
+                                views: pc ? pc[1] : "0",
+                                likes: dc ? dc[1] : "0",
+                                shares: sc ? sc[1] : "0",
+                                comments: cc ? cc[1] : "0",
+                            };
+                        }
                     }
                 } catch(e) {}
             }
-            // Also scan script tags for playCount patterns
+            // Also scan script tags
             if (Object.keys(data).length === 0) {
                 const scripts = document.querySelectorAll('script');
                 for (const s of scripts) {
@@ -322,21 +332,37 @@ def _extract_videos(page, keyword, min_views, min_likes):
                         const vidId = m[1];
                         const idx = text.indexOf('"' + vidId + '"');
                         if (idx === -1) continue;
-                        const chunk = text.substring(idx, idx + 800);
+                        const chunk = text.substring(idx, idx + 1200);
                         const pc = chunk.match(/"playCount"\\s*[:]\\s*"?(\\d+)"?/);
-                        if (pc) data[vidId] = pc[1];
+                        const dc = chunk.match(/"diggCount"\\s*[:]\\s*"?(\\d+)"?/);
+                        const sc = chunk.match(/"shareCount"\\s*[:]\\s*"?(\\d+)"?/);
+                        const cc = chunk.match(/"commentCount"\\s*[:]\\s*"?(\\d+)"?/);
+                        if (pc || dc) {
+                            data[vidId] = {
+                                views: pc ? pc[1] : "0",
+                                likes: dc ? dc[1] : "0",
+                                shares: sc ? sc[1] : "0",
+                                comments: cc ? cc[1] : "0",
+                            };
+                        }
                     }
                 }
             }
             return data;
         }""")
-        if view_data:
-            view_counts = {vid_id: int(count) for vid_id, count in view_data.items()}
+        if stats_data:
+            for vid_id, stats in stats_data.items():
+                video_stats[vid_id] = {
+                    "views": int(stats.get("views", 0)),
+                    "likes": int(stats.get("likes", 0)),
+                    "shares": int(stats.get("shares", 0)),
+                    "comments": int(stats.get("comments", 0)),
+                }
     except Exception:
         pass
 
-    # Strategy B: DOM-based extraction (fallback)
-    if not view_counts:
+    # Strategy B: DOM-based extraction (fallback — views only)
+    if not video_stats:
         try:
             view_data = page.evaluate("""() => {
                 const data = {};
@@ -364,20 +390,35 @@ def _extract_videos(page, keyword, min_views, min_likes):
                 return data;
             }""")
             if view_data:
-                view_counts = {vid_id: parse_count(count) for vid_id, count in view_data.items()}
+                for vid_id, count in view_data.items():
+                    video_stats[vid_id] = {
+                        "views": parse_count(count), "likes": 0,
+                        "shares": 0, "comments": 0,
+                    }
         except Exception:
             pass
 
     # Build results
+    skipped_engagement = 0
     for video_id in seen_ids:
-        views = view_counts.get(video_id, 0)
+        stats = video_stats.get(video_id, {"views": 0, "likes": 0, "shares": 0, "comments": 0})
+        views = stats["views"]
+        likes = stats["likes"]
+        shares = stats["shares"]
+        comments = stats["comments"]
 
         # Apply view filter (skip if views are known and below threshold)
         if min_views and views > 0 and views < min_views:
             continue
 
+        # Apply engagement ratio filter — likes/views is the best proxy for quality
+        if min_engagement_ratio and views > 0 and likes > 0:
+            ratio = likes / views
+            if ratio < min_engagement_ratio:
+                skipped_engagement += 1
+                continue
+
         # Reconstruct URL — we may not have the username, so use a redirect-friendly format
-        # TikTok resolves /video/ID even without the username
         url = f"https://www.tiktok.com/@_/video/{video_id}"
 
         # Try to find the real URL with username from the page
@@ -395,8 +436,14 @@ def _extract_videos(page, keyword, min_views, min_likes):
         results.append({
             "url": url,
             "views": views,
+            "likes": likes,
+            "shares": shares,
+            "comments": comments,
             "keyword": keyword,
         })
+
+    if skipped_engagement:
+        print(f"   ⏭  Skipped {skipped_engagement} low-engagement videos")
 
     return results
 

@@ -19,18 +19,18 @@ KEYWORDS = [                           # Default keywords (used when no niche sp
 # Add new niches here — the pipeline and scraper will auto-detect them.
 NICHES = {
     "memes": [
-        # Core — proven performers
-        "TJR", "TJR edit", "TJR meme",
-        "wolf of wall street", "wolf of wall street meme",
-        "wolf of wall street edit", "jordan belfort meme",
-        # Adjacent sigma/hustle (same audience)
-        "sigma grindset", "sigma edit", "hustle meme",
-        "crypto meme", "trading meme",
+        # Proven performers — your best content
+        "TJR", "wolf of wall street edit",
+        # Broad discovery — let engagement ratio do the filtering
+        "funny meme compilation", "meme that made me cry laughing",
+        "try not to laugh", "funniest video ever",
+        "perfectly cut screams", "unexpected ending",
     ],
 }
 MAX_VIDEOS_PER_KEYWORD = 50            # Videos to collect per keyword
-MIN_VIEWS = 500_000                    # Minimum view count — only high quality content
+MIN_VIEWS = 1_000_000                  # Minimum view count — viral only
 MIN_LIKES = 0                          # Minimum like count (0 = no filter)
+MIN_ENGAGEMENT_RATIO = 0.05            # Min likes/views ratio (5% = genuinely good)
 SCROLL_COUNT = 10                      # Times to scroll for more results
 HEADLESS = True                        # Run browser without GUI
 
