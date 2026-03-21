@@ -4,11 +4,13 @@ All tunables in one place.
 """
 
 import os
+from dotenv import load_dotenv
+load_dotenv()
 
 # ─── TikTok Search ────────────────────────────────────────────────────
 KEYWORDS = [                           # Default keywords (used when no niche specified)
-    "jester maxxing", "clavicular", "TJR", "brainrot",
-    "togi", "clav", "crypto", "wolf of wall street",
+    "TJR", "TJR edit", "wolf of wall street meme",
+    "sigma grindset", "hustle meme", "crypto meme",
 ]
 
 # ─── Niche Presets ────────────────────────────────────────────────────
@@ -17,13 +19,18 @@ KEYWORDS = [                           # Default keywords (used when no niche sp
 # Add new niches here — the pipeline and scraper will auto-detect them.
 NICHES = {
     "memes": [
-        "jester maxxing", "clavicular", "TJR", "brainrot",
-        "togi", "clav", "crypto", "wolf of wall street",
+        # Proven performers — your best content
+        "TJR", "wolf of wall street edit",
+        # Broad discovery — let engagement ratio do the filtering
+        "funny meme compilation", "meme that made me cry laughing",
+        "try not to laugh", "funniest video ever",
+        "perfectly cut screams", "unexpected ending",
     ],
 }
 MAX_VIDEOS_PER_KEYWORD = 50            # Videos to collect per keyword
-MIN_VIEWS = 500_000                    # Minimum view count — only high quality content
+MIN_VIEWS = 1_000_000                  # Minimum view count — viral only
 MIN_LIKES = 0                          # Minimum like count (0 = no filter)
+MIN_ENGAGEMENT_RATIO = 0.05            # Min likes/views ratio (5% = genuinely good)
 SCROLL_COUNT = 10                      # Times to scroll for more results
 HEADLESS = True                        # Run browser without GUI
 

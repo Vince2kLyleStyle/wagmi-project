@@ -125,6 +125,11 @@ def create_client(session_file: str | None = None) -> Client:
     """
     cl = Client()
 
+    # Apply proxy if configured
+    if config.PROXY:
+        cl.set_proxy(config.PROXY)
+        print(f"  [proxy] Using proxy: {config.PROXY.split('@')[-1] if '@' in config.PROXY else config.PROXY}")
+
     # Apply today's device fingerprint (consistent for the whole day)
     dev = devices.get_device()
     cl.set_device(dev)

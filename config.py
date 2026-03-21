@@ -4,12 +4,21 @@ All tunables in one place.
 """
 
 import os
+from dotenv import load_dotenv
+load_dotenv()
 
 # ─── Account ────────────────────────────────────────────────────────
 USERNAME = os.getenv("IG_USERNAME", "dumbmoneyonsolana")
 PASSWORD = os.getenv("IG_PASSWORD", "InstagramPassword1")
 SESSION_DIR = os.path.join(os.path.dirname(__file__), "sessions")
 SESSION_FILE = os.path.join(SESSION_DIR, f"{USERNAME}_session.json")
+
+# ─── Proxy ─────────────────────────────────────────────────────────
+# Set via env var or directly here. Supports http/https/socks5.
+# Examples:
+#   http://user:pass@host:port
+#   socks5://user:pass@host:port
+PROXY = os.getenv("IG_PROXY", "")
 
 # ─── Video Source ───────────────────────────────────────────────────
 VIDEO_DIR = os.path.join(os.path.dirname(__file__), "tiktok_videos", "memes")
