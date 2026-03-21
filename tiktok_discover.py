@@ -58,7 +58,7 @@ def login_to_tiktok():
         context = p.chromium.launch_persistent_context(
             BROWSER_PROFILE_DIR,
             headless=False,
-            channel="chrome",
+            # channel="chrome",  # Use bundled Chromium instead of system Chrome
             args=STEALTH_ARGS,
             viewport={"width": 1280, "height": 900},
         )
@@ -104,7 +104,7 @@ def scrape_tiktok(keywords, max_per_keyword=20, min_views=0, min_likes=0,
         context = p.chromium.launch_persistent_context(
             BROWSER_PROFILE_DIR,
             headless=headless,
-            channel="chrome",
+            # channel="chrome",  # Use bundled Chromium instead of system Chrome
             args=STEALTH_ARGS,
             viewport={"width": 1280, "height": 900},
         )
