@@ -9,6 +9,7 @@ import os
 KEYWORDS = [                           # Default keywords (used when no niche specified)
     "jester maxxing", "clavicular", "TJR", "brainrot",
     "togi", "clav", "crypto", "wolf of wall street",
+    "maxxing", "mogging", "tungtungtung",
 ]
 
 # ─── Niche Presets ────────────────────────────────────────────────────
@@ -19,6 +20,7 @@ NICHES = {
     "memes": [
         "jester maxxing", "clavicular", "TJR", "brainrot",
         "togi", "clav", "crypto", "wolf of wall street",
+        "maxxing", "mogging", "tungtungtung",
     ],
 }
 MAX_VIDEOS_PER_KEYWORD = 50            # Videos to collect per keyword
