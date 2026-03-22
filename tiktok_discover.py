@@ -1469,9 +1469,46 @@ def scrape_account(username, max_videos=100, scroll_count=25, headless=True,
             context.close()
             return [], []
 
-        time.sleep(random.uniform(3, 5))
+        time.sleep(random.uniform(4, 6))
         _dismiss_popups(page)
         time.sleep(random.uniform(1, 2))
+
+        # Debug: check what's on the page
+        page_url = page.url
+        page_title = page.title()
+        print(f"   🔗  URL: {page_url}")
+        print(f"   📄  Title: {page_title}")
+
+        # Check for various video link patterns on profile pages
+        debug_counts = page.evaluate("""() => {
+            return {
+                'a_video': document.querySelectorAll('a[href*="/video/"]').length,
+                'user_post_item': document.querySelectorAll('div[data-e2e="user-post-item"]').length,
+                'user_post_item_a': document.querySelectorAll('div[data-e2e="user-post-item"] a').length,
+                'item_container': document.querySelectorAll('div[class*="DivItemContainer"]').length,
+                'video_feed': document.querySelectorAll('div[class*="VideoFeed"], div[class*="video-feed"]').length,
+                'all_links': document.querySelectorAll('a').length,
+                'data_e2e_els': document.querySelectorAll('[data-e2e]').length,
+            };
+        }""")
+        print(f"   🔍  DOM: {debug_counts}")
+
+        # Sample hrefs to understand link structure
+        sample_links = page.evaluate("""() => {
+            const links = document.querySelectorAll('a');
+            const hrefs = [];
+            for (const link of links) {
+                const h = link.href || '';
+                if (h.includes('tiktok.com') && (h.includes('/video/') || h.includes('/photo/'))) {
+                    hrefs.push(h);
+                }
+            }
+            return hrefs.slice(0, 5);
+        }""")
+        if sample_links:
+            print(f"   🔗  Sample: {sample_links[:3]}")
+        else:
+            print(f"   ⚠  No /video/ or /photo/ links found in DOM")
 
         # Scroll to load all videos
         prev_count = 0
@@ -1490,11 +1527,16 @@ def scrape_account(username, max_videos=100, scroll_count=25, headless=True,
             except Exception:
                 pass
 
-            cur_dom = len(page.query_selector_all('a[href*="/video/"]'))
+            # Broad selector to catch profile video links
+            cur_dom = len(page.query_selector_all(
+                'a[href*="/video/"], a[href*="/photo/"], '
+                'div[data-e2e="user-post-item"] a'
+            ))
             cur_api = len(profile_api_videos)
             cur_count = max(cur_dom, cur_api)
 
-            print(f"   📜  Scroll {i+1}/{scroll_count} — {cur_dom} DOM / {cur_api} API videos", end="\r")
+            if i < 3 or cur_count != prev_count:
+                print(f"   📜  Scroll {i+1}/{scroll_count} — {cur_dom} DOM / {cur_api} API videos")
 
             if cur_count <= prev_count:
                 stale += 1
@@ -1503,8 +1545,6 @@ def scrape_account(username, max_videos=100, scroll_count=25, headless=True,
             else:
                 stale = 0
             prev_count = cur_count
-
-        print()  # Clear the \r line
 
         # Extract videos from DOM
         dom_videos = page.evaluate("""() => {
