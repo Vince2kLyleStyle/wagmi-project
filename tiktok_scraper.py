@@ -17,7 +17,7 @@ import sys
 from datetime import datetime
 
 import scraper_config as cfg
-from tiktok_discover import scrape_tiktok, login_to_tiktok, scrape_tiktok_by_caption, scrape_accounts_from_captions
+from tiktok_discover import scrape_tiktok, login_to_tiktok, scrape_tiktok_by_caption, scrape_accounts_from_captions, scrape_account
 from telegram_sender import send_urls_sync, send_and_download_sync, telegram_login_sync
 from telegram_pull import pull_videos_sync
 
@@ -183,6 +183,10 @@ def main():
         help="Custom viral caption to search for (default: uses config)"
     )
     parser.add_argument(
+        "--account", type=str, nargs="+", default=None,
+        help="Scrape account(s) for videos + harvest captions (e.g. --account @flopolos)"
+    )
+    parser.add_argument(
         "--bulk", action="store_true",
         help="Bulk mode: search multiple captions → find accounts → scrape their profiles"
     )
@@ -223,6 +227,73 @@ def main():
         count = pull_videos_sync(args.pull_chat, download_dir, limit=args.pull_limit)
         print(f"\n{'═' * 54}")
         print(f"  DONE! {count} videos pulled from Telegram.")
+        print(f"{'═' * 54}\n")
+        sys.exit(0)
+
+    # ─── Account scrape mode ──────────────────────────────────────
+    if args.account:
+        niche_name = args.niche[0] if args.niche else "memes"
+        download_dir = os.path.join(cfg.DOWNLOAD_DIR, niche_name)
+
+        print(f"  Mode:         ACCOUNT SCRAPE")
+        print(f"  Accounts:     {', '.join(args.account)}")
+        print(f"  Niche:        {niche_name}")
+        print(f"  Download to:  {download_dir}")
+        print()
+
+        existing = load_existing_urls(args.output)
+        all_new = []
+        all_captions = []
+
+        for acct in args.account:
+            videos, captions = scrape_account(
+                username=acct,
+                max_videos=args.max,
+                scroll_count=args.scrolls,
+                headless=not args.no_headless,
+                min_views=args.min_views,
+            )
+            new_vids = [v for v in videos if v["url"] not in existing]
+            for v in new_vids:
+                existing.add(v["url"])
+            all_new.extend(new_vids)
+            all_captions.extend(captions)
+
+        print(f"\n  📊  {len(all_new)} new videos from {len(args.account)} account(s)")
+
+        if all_new:
+            save_urls(all_new, args.output)
+
+            for r in all_new[:15]:
+                views = f"{r['views']:>10,}" if r["views"] else "   unknown"
+                cap = r.get("caption", "")[:40]
+                print(f"  {views} views | {cap}...")
+            if len(all_new) > 15:
+                print(f"  ... and {len(all_new) - 15} more")
+
+            if not args.no_telegram:
+                urls = [r["url"] for r in all_new]
+                if args.no_download:
+                    sent, failed = send_urls_sync(urls)
+                    print(f"\n  📱  Sent {sent}, failed {failed}")
+                else:
+                    sent, downloaded, failed = send_and_download_sync(
+                        urls, download_dir=download_dir
+                    )
+                    print(f"\n  📱  Sent {sent}, downloaded {downloaded}, failed {failed}")
+
+        # Save harvested captions
+        if all_captions:
+            captions_file = os.path.join(os.path.dirname(__file__), "harvested_captions.txt")
+            with open(captions_file, "a", encoding="utf-8") as f:
+                for cap in all_captions:
+                    f.write(cap.replace("\n", " ").strip() + "\n")
+            print(f"\n  📝  {len(all_captions)} captions saved to harvested_captions.txt")
+            print(f"      Copy the best ones into VIRAL_CAPTIONS in scraper_config.py")
+            print(f"      Then run:  py tiktok_scraper.py --bulk --niche {niche_name}")
+
+        print(f"\n{'═' * 54}")
+        print(f"  DONE! {len(all_new)} videos from account scrape.")
         print(f"{'═' * 54}\n")
         sys.exit(0)
 

@@ -1365,6 +1365,237 @@ def scrape_accounts_from_captions(captions_list, max_account_videos=30,
     return all_results
 
 
+def scrape_account(username, max_videos=100, scroll_count=25, headless=True,
+                    min_views=0):
+    """
+    Scrape a single TikTok account's profile.
+    Returns (videos_list, captions_list):
+      - videos_list: dicts with url, views, likes, caption, etc.
+      - captions_list: unique captions (for feeding into bulk caption discovery)
+    """
+    from playwright.sync_api import sync_playwright
+    import json as _json
+
+    username = username.lstrip("@")
+    profile_url = f"https://www.tiktok.com/@{username}"
+
+    has_profile = os.path.exists(BROWSER_PROFILE_DIR)
+    if not has_profile:
+        print("   ⚠  No saved TikTok session found. Run with --login first.")
+        return [], []
+
+    all_results = []
+    seen_video_ids = set()
+    captions = []
+    profile_api_videos = {}
+
+    def _handle_profile_api(response):
+        """Intercept profile video list API responses."""
+        try:
+            url = response.url
+            # Match profile/user video endpoints
+            if ("/api/post/" not in url and
+                "/item_list/" not in url and
+                "post/item_list" not in url and
+                "/api/user/" not in url and
+                "/api/recommend/" not in url):
+                return
+            if response.status != 200:
+                return
+            content_type = response.headers.get("content-type", "")
+            if "json" not in content_type and "javascript" not in content_type:
+                return
+            body = response.text()
+            if body.startswith("(") or body.startswith("jsonp"):
+                start = body.index("(") + 1
+                end = body.rindex(")")
+                body = body[start:end]
+            data = _json.loads(body)
+            video_list = []
+            if isinstance(data, dict):
+                for key in ["itemList", "item_list", "items", "data"]:
+                    if key in data and isinstance(data[key], list):
+                        video_list = data[key]
+                        break
+                if not video_list and "data" in data and isinstance(data["data"], dict):
+                    inner = data["data"]
+                    for key in ["itemList", "item_list", "items"]:
+                        if key in inner and isinstance(inner[key], list):
+                            video_list = inner[key]
+                            break
+            for item in video_list:
+                if not isinstance(item, dict):
+                    continue
+                vid_id = str(item.get("id", "") or item.get("video_id", "") or
+                            item.get("aweme_id", ""))
+                if not vid_id or len(vid_id) < 10:
+                    continue
+                desc = item.get("desc", "") or item.get("title", "") or ""
+                stats = item.get("stats", {}) or item.get("statistics", {}) or {}
+                views = (stats.get("playCount") or stats.get("play_count") or
+                        stats.get("viewCount") or stats.get("view_count") or 0)
+                likes = (stats.get("diggCount") or stats.get("digg_count") or
+                        stats.get("likeCount") or stats.get("like_count") or 0)
+                shares = stats.get("shareCount") or stats.get("share_count") or 0
+                comments = stats.get("commentCount") or stats.get("comment_count") or 0
+                profile_api_videos[vid_id] = {
+                    "video_id": vid_id, "caption": desc,
+                    "views": int(views) if views else 0,
+                    "likes": int(likes) if likes else 0,
+                    "shares": int(shares) if shares else 0,
+                    "comments": int(comments) if comments else 0,
+                    "url": f"https://www.tiktok.com/@{username}/video/{vid_id}",
+                    "author": username,
+                }
+        except Exception:
+            pass
+
+    with sync_playwright() as p:
+        context = p.chromium.launch_persistent_context(
+            BROWSER_PROFILE_DIR,
+            headless=headless,
+            args=STEALTH_ARGS,
+            viewport={"width": 1280, "height": 900},
+        )
+        page = context.new_page()
+        page.on("response", _handle_profile_api)
+
+        print(f"\n   👤  Loading profile: @{username}")
+
+        try:
+            page.goto(profile_url, wait_until="domcontentloaded", timeout=30000)
+        except Exception as e:
+            print(f"   ⚠  Failed to load profile: {e}")
+            context.close()
+            return [], []
+
+        time.sleep(random.uniform(3, 5))
+        _dismiss_popups(page)
+        time.sleep(random.uniform(1, 2))
+
+        # Scroll to load all videos
+        prev_count = 0
+        stale = 0
+        for i in range(scroll_count):
+            page.evaluate("window.scrollTo(0, document.body.scrollHeight)")
+            time.sleep(random.uniform(1.5, 3))
+
+            try:
+                load_more = page.query_selector(
+                    'button:has-text("Load more"), button[class*="more"]'
+                )
+                if load_more:
+                    load_more.click()
+                    time.sleep(random.uniform(1.5, 2.5))
+            except Exception:
+                pass
+
+            cur_dom = len(page.query_selector_all('a[href*="/video/"]'))
+            cur_api = len(profile_api_videos)
+            cur_count = max(cur_dom, cur_api)
+
+            print(f"   📜  Scroll {i+1}/{scroll_count} — {cur_dom} DOM / {cur_api} API videos", end="\r")
+
+            if cur_count <= prev_count:
+                stale += 1
+                if stale >= 3:
+                    break
+            else:
+                stale = 0
+            prev_count = cur_count
+
+        print()  # Clear the \r line
+
+        # Extract videos from DOM
+        dom_videos = page.evaluate("""() => {
+            const results = [];
+            const links = document.querySelectorAll('a[href*="/video/"]');
+            for (const link of links) {
+                const href = link.href || '';
+                let views = '';
+                const strongEls = link.querySelectorAll('strong, span');
+                for (const el of strongEls) {
+                    const t = el.textContent.trim();
+                    if (/^[\\d.]+[KMB]?$/i.test(t) && t.length <= 10) {
+                        views = t;
+                        break;
+                    }
+                }
+                results.push({href, views});
+            }
+            return results;
+        }""")
+
+        # Extract from embedded JSON
+        json_data = _extract_json_captions(page)
+
+        context.close()
+
+    # Merge everything
+    for vid_data in (dom_videos or []):
+        href = vid_data.get("href", "")
+        vid_match = re.search(r'/video/(\d+)', href)
+        if not vid_match:
+            continue
+        vid_id = vid_match.group(1)
+        if vid_id in seen_video_ids:
+            continue
+
+        full_url = href if href.startswith("http") else f"https://www.tiktok.com{href}"
+        api_info = profile_api_videos.get(vid_id) or {}
+        json_info = (json_data or {}).get(vid_id) or {}
+
+        views = api_info.get("views") or json_info.get("views") or parse_count(vid_data.get("views", ""))
+        likes = api_info.get("likes") or json_info.get("likes") or 0
+        caption = api_info.get("caption") or json_info.get("caption", "") or ""
+
+        if min_views and views > 0 and views < min_views:
+            continue
+
+        seen_video_ids.add(vid_id)
+        all_results.append({
+            "url": full_url,
+            "views": views,
+            "likes": likes,
+            "shares": api_info.get("shares", 0),
+            "comments": api_info.get("comments", 0),
+            "keyword": f"@{username}",
+            "caption": caption[:100],
+            "author": username,
+        })
+        if caption and len(caption.strip()) > 20:
+            captions.append(caption)
+
+    # Also add API-only videos
+    for vid_id, api_info in profile_api_videos.items():
+        if vid_id in seen_video_ids:
+            continue
+        url = api_info.get("url", f"https://www.tiktok.com/@{username}/video/{vid_id}")
+        views = api_info.get("views", 0)
+        if min_views and views > 0 and views < min_views:
+            continue
+        seen_video_ids.add(vid_id)
+        caption = api_info.get("caption", "")
+        all_results.append({
+            "url": url,
+            "views": views,
+            "likes": api_info.get("likes", 0),
+            "shares": api_info.get("shares", 0),
+            "comments": api_info.get("comments", 0),
+            "keyword": f"@{username}",
+            "caption": caption[:100],
+            "author": username,
+        })
+        if caption and len(caption.strip()) > 20:
+            captions.append(caption)
+
+    # Deduplicate captions
+    unique_captions = list(dict.fromkeys(captions))
+
+    print(f"   ✅  @{username}: {len(all_results)} videos, {len(unique_captions)} unique captions")
+    return all_results, unique_captions
+
+
 if __name__ == "__main__":
     # Quick test
     results = scrape_tiktok(["gym"], max_per_keyword=5, scroll_count=2, headless=False)
