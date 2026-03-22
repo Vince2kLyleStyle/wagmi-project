@@ -37,6 +37,23 @@ VIRAL_CAPTION_SEARCH = (
 )
 # How much of the caption must match to count (0.0-1.0)
 CAPTION_MATCH_THRESHOLD = 0.35
+
+# ─── Bulk Mode: Multiple Viral Captions ──────────────────────────────
+# Accounts that use these captions post the type of content we want.
+# Phase 1: Search captions → discover accounts
+# Phase 2: Scrape each account's full profile → get ALL their videos
+# Add more captions here to discover more accounts and get more content.
+VIRAL_CAPTIONS = [
+    # Japan piezoelectric tiles
+    "Japan is turning footsteps into electricity "
+    "Using piezoelectric tiles every step you take generates a small amount of energy",
+
+    # Titanic Korean caption
+    "1997년 개봉한 영화 Titanic은 잭과 로즈의 운명적인 사랑을 통해 비극 속에서도 오래 남는 감정의 깊이를 보여주는 작품입니다",
+]
+
+# Max videos to grab per discovered account
+MAX_VIDEOS_PER_ACCOUNT = 30
 MAX_VIDEOS_PER_KEYWORD = 200            # Videos to collect per keyword
 MIN_VIEWS = 100_000                    # Minimum view count (lowered to catch more caption copies)
 MIN_LIKES = 0                          # Minimum like count (0 = no filter)

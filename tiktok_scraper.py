@@ -17,7 +17,7 @@ import sys
 from datetime import datetime
 
 import scraper_config as cfg
-from tiktok_discover import scrape_tiktok, login_to_tiktok, scrape_tiktok_by_caption
+from tiktok_discover import scrape_tiktok, login_to_tiktok, scrape_tiktok_by_caption, scrape_accounts_from_captions
 from telegram_sender import send_urls_sync, send_and_download_sync, telegram_login_sync
 from telegram_pull import pull_videos_sync
 
@@ -183,6 +183,10 @@ def main():
         help="Custom viral caption to search for (default: uses config)"
     )
     parser.add_argument(
+        "--bulk", action="store_true",
+        help="Bulk mode: search multiple captions → find accounts → scrape their profiles"
+    )
+    parser.add_argument(
         "--pull-chat", type=str, default=None,
         help='Pull videos from a Telegram chat (e.g. --pull-chat "Friend Name")'
     )
@@ -229,6 +233,66 @@ def main():
             print(f"    {name:15s} → {', '.join(kws[:5])}{'...' if len(kws) > 5 else ''}")
         print(f"\n  Usage:  py tiktok_scraper.py --niche {list(cfg.NICHES.keys())[0]}")
         print(f"  All:    py tiktok_scraper.py --niche {' '.join(cfg.NICHES.keys())}")
+        sys.exit(0)
+
+    # ─── Bulk mode: multi-caption → account discovery → profile scrape ─
+    if args.bulk:
+        captions = cfg.VIRAL_CAPTIONS
+        if not captions:
+            print("  ❌  No captions configured in VIRAL_CAPTIONS.")
+            print("  Add captions to scraper_config.py VIRAL_CAPTIONS list.")
+            sys.exit(1)
+
+        niche_name = args.niche[0] if args.niche else "memes"
+        download_dir = os.path.join(cfg.DOWNLOAD_DIR, niche_name)
+
+        print(f"  Mode:         BULK (caption → account → profile scrape)")
+        print(f"  Captions:     {len(captions)}")
+        print(f"  Max/account:  {cfg.MAX_VIDEOS_PER_ACCOUNT}")
+        print(f"  Niche:        {niche_name}")
+        print(f"  Download to:  {download_dir}")
+        print()
+
+        existing = load_existing_urls(args.output)
+        results = scrape_accounts_from_captions(
+            captions_list=captions,
+            max_account_videos=cfg.MAX_VIDEOS_PER_ACCOUNT,
+            scroll_count=args.scrolls,
+            headless=not args.no_headless,
+            min_views=args.min_views,
+            match_threshold=cfg.CAPTION_MATCH_THRESHOLD,
+        )
+
+        new_results = [r for r in results if r["url"] not in existing]
+        print(f"\n  📊  {len(results)} total, {len(new_results)} new")
+
+        if new_results:
+            save_urls(new_results, args.output)
+
+            # Show by account
+            by_author = {}
+            for r in new_results:
+                auth = r.get("author", "unknown")
+                by_author.setdefault(auth, []).append(r)
+
+            for auth, vids in by_author.items():
+                total_views = sum(v["views"] for v in vids if v["views"])
+                print(f"    @{auth:20s} → {len(vids):3d} videos | {total_views:>12,} total views")
+
+            if not args.no_telegram:
+                urls = [r["url"] for r in new_results]
+                if args.no_download:
+                    sent, failed = send_urls_sync(urls)
+                    print(f"\n  📱  Sent {sent}, failed {failed}")
+                else:
+                    sent, downloaded, failed = send_and_download_sync(
+                        urls, download_dir=download_dir
+                    )
+                    print(f"\n  📱  Sent {sent}, downloaded {downloaded}, failed {failed}")
+
+        print(f"\n{'═' * 54}")
+        print(f"  DONE! {len(new_results)} new videos from {len(captions)} captions.")
+        print(f"{'═' * 54}\n")
         sys.exit(0)
 
     # ─── Caption search mode ─────────────────────────────────────
