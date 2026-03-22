@@ -100,6 +100,36 @@ async def pull_videos(client, chat_name, download_dir, limit=100, min_size_mb=0.
     return downloaded
 
 
+def pull_videos_sync(chat_name, download_dir, limit=200):
+    """Synchronous wrapper — pull videos from a Telegram chat."""
+    return asyncio.run(_pull_videos_entry(chat_name, download_dir, limit))
+
+
+async def _pull_videos_entry(chat_name, download_dir, limit):
+    """Connect to Telegram and pull videos from a chat."""
+    api_id = cfg.TELEGRAM_API_ID
+    api_hash = cfg.TELEGRAM_API_HASH
+
+    if not api_id or not api_hash:
+        print("\n  Telegram API credentials not set!")
+        print("  Run: py tiktok_scraper.py --telegram-login")
+        return 0
+
+    session_path = os.path.join(cfg.TELEGRAM_SESSION_DIR, cfg.TELEGRAM_SESSION_NAME)
+    client = TelegramClient(session_path, int(api_id), api_hash)
+    await client.connect()
+
+    if not await client.is_user_authorized():
+        print("\n  Telegram session expired! Run: py tiktok_scraper.py --telegram-login")
+        await client.disconnect()
+        return 0
+
+    try:
+        return await pull_videos(client, chat_name, download_dir, limit=limit)
+    finally:
+        await client.disconnect()
+
+
 async def main_async(args):
     api_id = cfg.TELEGRAM_API_ID
     api_hash = cfg.TELEGRAM_API_HASH

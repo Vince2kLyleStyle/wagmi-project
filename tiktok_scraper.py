@@ -19,6 +19,7 @@ from datetime import datetime
 import scraper_config as cfg
 from tiktok_discover import scrape_tiktok, login_to_tiktok, scrape_tiktok_by_caption
 from telegram_sender import send_urls_sync, send_and_download_sync, telegram_login_sync
+from telegram_pull import pull_videos_sync
 
 BANNER = """
 ╔══════════════════════════════════════════════════════╗
@@ -182,6 +183,14 @@ def main():
         help="Custom viral caption to search for (default: uses config)"
     )
     parser.add_argument(
+        "--pull-chat", type=str, default=None,
+        help='Pull videos from a Telegram chat (e.g. --pull-chat "Friend Name")'
+    )
+    parser.add_argument(
+        "--pull-limit", type=int, default=200,
+        help="Max messages to scan in the chat (default: 200)"
+    )
+    parser.add_argument(
         "-o", "--output", default=cfg.OUTPUT_FILE,
         help=f"URL log file (default: {cfg.OUTPUT_FILE})"
     )
@@ -196,6 +205,21 @@ def main():
 
     if args.telegram_login:
         telegram_login_sync()
+        sys.exit(0)
+
+    # ─── Pull from Telegram chat ──────────────────────────────────
+    if args.pull_chat:
+        niche_name = args.niche[0] if args.niche else "memes"
+        download_dir = os.path.join(cfg.DOWNLOAD_DIR, niche_name)
+        print(f"  Mode:         TELEGRAM PULL")
+        print(f"  Chat:         \"{args.pull_chat}\"")
+        print(f"  Scan limit:   {args.pull_limit} messages")
+        print(f"  Download to:  {download_dir}")
+        print()
+        count = pull_videos_sync(args.pull_chat, download_dir, limit=args.pull_limit)
+        print(f"\n{'═' * 54}")
+        print(f"  DONE! {count} videos pulled from Telegram.")
+        print(f"{'═' * 54}\n")
         sys.exit(0)
 
     # ─── List niches ─────────────────────────────────────────────
