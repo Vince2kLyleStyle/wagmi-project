@@ -9,8 +9,8 @@ load_dotenv()
 
 # ─── TikTok Search ────────────────────────────────────────────────────
 KEYWORDS = [                           # Default keywords (used when no niche specified)
-    "TJR", "TJR edit", "wolf of wall street meme",
-    "sigma grindset", "hustle meme", "crypto meme",
+    "shitpost", "brainrot", "low quality meme",
+    "deep fried meme", "cursed video", "unhinged meme",
 ]
 
 # ─── Niche Presets ────────────────────────────────────────────────────
@@ -19,12 +19,9 @@ KEYWORDS = [                           # Default keywords (used when no niche sp
 # Add new niches here — the pipeline and scraper will auto-detect them.
 NICHES = {
     "memes": [
-        # Proven performers — your best content
-        "TJR", "wolf of wall street edit",
-        # Broad discovery — let engagement ratio do the filtering
-        "funny meme compilation", "meme that made me cry laughing",
-        "try not to laugh", "funniest video ever",
-        "perfectly cut screams", "unexpected ending",
+        "shitpost", "brainrot",
+        "low quality meme", "deep fried meme",
+        "cursed video", "unhinged meme",
     ],
 }
 
@@ -55,9 +52,9 @@ VIRAL_CAPTIONS = [
 # Max videos to grab per discovered account
 MAX_VIDEOS_PER_ACCOUNT = 30
 MAX_VIDEOS_PER_KEYWORD = 200            # Videos to collect per keyword
-MIN_VIEWS = 100_000                    # Minimum view count (lowered to catch more caption copies)
+MIN_VIEWS = 50_000                     # Lowered for shitpost/brainrot content
 MIN_LIKES = 0                          # Minimum like count (0 = no filter)
-MIN_ENGAGEMENT_RATIO = 0.05            # Min likes/views ratio (5% = genuinely good)
+MIN_ENGAGEMENT_RATIO = 0.03            # Min likes/views ratio (3% = cast a wider net)
 SCROLL_COUNT = 25                      # Times to scroll for more results
 HEADLESS = True                        # Run browser without GUI
 
