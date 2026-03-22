@@ -596,111 +596,6 @@ def _extract_json_captions(page):
     }""")
 
 
-def _filter_extracted_videos(video_data, json_captions, page, viral_caption,
-                             match_threshold, min_views, seen_urls, max_videos):
-    """
-    Filter extracted video data. Returns (results, checked, matched, no_caption_count).
-    """
-    results = []
-    checked = 0
-    matched = 0
-    no_caption_count = 0
-
-    for item in (video_data or []):
-        href = item.get("href", "")
-        caption = item.get("caption", "")
-        views_str = item.get("views", "")
-
-        if not href or "/video/" not in href:
-            continue
-
-        vid_match = re.search(r'/video/(\d+)', href)
-        if not vid_match:
-            continue
-
-        video_id = vid_match.group(1)
-        full_url = href if href.startswith("http") else f"https://www.tiktok.com{href}"
-
-        json_info = (json_captions or {}).get(video_id, {})
-        if json_info.get("caption") and len(json_info["caption"]) > len(caption):
-            caption = json_info["caption"]
-
-        views = json_info.get("views", 0) or parse_count(views_str)
-        likes = json_info.get("likes", 0)
-
-        checked += 1
-
-        if full_url in seen_urls:
-            continue
-
-        has_caption = bool(caption and len(caption.strip()) > 5)
-        if has_caption:
-            if not _caption_matches(caption, viral_caption, match_threshold):
-                continue
-        else:
-            no_caption_count += 1
-
-        if min_views and views > 0 and views < min_views:
-            continue
-
-        seen_urls.add(full_url)
-        matched += 1
-        results.append({
-            "url": full_url,
-            "views": views,
-            "likes": likes,
-            "shares": 0,
-            "comments": 0,
-            "keyword": "viral_caption",
-            "caption": caption[:100] if has_caption else "(from search)",
-        })
-
-        if len(results) >= max_videos:
-            break
-
-    # Also check JSON-only videos not in DOM
-    for video_id, info in (json_captions or {}).items():
-        if len(results) >= max_videos:
-            break
-        url = f"https://www.tiktok.com/@_/video/{video_id}"
-        if url in seen_urls:
-            continue
-        caption = info.get("caption", "")
-        views = info.get("views", 0)
-        likes = info.get("likes", 0)
-        checked += 1
-
-        if not _caption_matches(caption, viral_caption, match_threshold):
-            continue
-        if min_views and views > 0 and views < min_views:
-            continue
-
-        try:
-            real_link = page.query_selector(f'a[href*="/video/{video_id}"]')
-            if real_link:
-                real_href = real_link.get_attribute("href") or ""
-                if real_href.startswith("http"):
-                    url = real_href
-                elif real_href.startswith("/"):
-                    url = "https://www.tiktok.com" + real_href
-        except Exception:
-            pass
-
-        seen_urls.add(url)
-        matched += 1
-        results.append({
-            "url": url,
-            "views": views,
-            "likes": likes,
-            "shares": 0,
-            "comments": 0,
-            "keyword": "viral_caption",
-            "caption": caption[:100],
-        })
-
-    return results, checked, matched, no_caption_count
-
-
 def _scroll_page(page, scroll_count):
     """Scroll the page to load more results. Returns total link count."""
     prev_count = 0
@@ -724,17 +619,28 @@ def _scroll_page(page, scroll_count):
 def scrape_tiktok_by_caption(viral_caption, max_videos=50, scroll_count=10,
                               headless=True, min_views=0, match_threshold=0.5):
     """
-    Search TikTok for the viral caption text using multiple query variations
-    and sort tabs to maximize results. Returns list of matching video dicts.
+    Search TikTok for videos using a viral caption. Uses API response
+    interception to get reliable captions + DOM fallback.
+
+    Strategy:
+    1. Intercept TikTok's search API XHR responses → structured JSON with
+       full captions, view counts, etc.
+    2. Also scrape DOM as fallback
+    3. Run multiple search queries (full caption, halves, middle chunk)
+    4. Match extracted captions against the viral caption
+
+    Returns list of dicts with url, views, likes, caption, etc.
     """
     from playwright.sync_api import sync_playwright
     from urllib.parse import quote
+    import json as _json
 
     results = []
     seen_urls = set()
+    seen_video_ids = set()
+    api_videos = {}          # video_id → {caption, views, likes, url, ...}
     total_checked = 0
     total_matched = 0
-    total_no_caption = 0
 
     has_profile = os.path.exists(BROWSER_PROFILE_DIR)
     if not has_profile:
@@ -744,14 +650,91 @@ def scrape_tiktok_by_caption(viral_caption, max_videos=50, scroll_count=10,
     # Build multiple search queries from the caption
     search_queries = _build_search_queries(viral_caption)
 
-    # TikTok search sort tabs — each surfaces different results
-    sort_filters = [
-        "",                          # Default/relevance
-        "&sort_by=0",                # Relevance (explicit)
-        "&sort_by=1",                # Most liked
-    ]
+    print(f"\n🔍  Caption search with {len(search_queries)} query variations (API interception + DOM)")
 
-    print(f"\n🔍  Caption search with {len(search_queries)} query variations × {len(sort_filters)} sort modes")
+    def _handle_api_response(response):
+        """Intercept TikTok search API responses to extract structured video data."""
+        try:
+            url = response.url
+            # TikTok search API endpoints
+            if ("/api/search/" not in url and
+                "/search/item/" not in url and
+                "search_item" not in url and
+                "/api/recommend/" not in url):
+                return
+            if response.status != 200:
+                return
+            content_type = response.headers.get("content-type", "")
+            if "json" not in content_type and "javascript" not in content_type:
+                return
+
+            body = response.text()
+            # Handle JSONP wrapper if present
+            if body.startswith("(") or body.startswith("jsonp"):
+                start = body.index("(") + 1
+                end = body.rindex(")")
+                body = body[start:end]
+
+            data = _json.loads(body)
+
+            # TikTok API returns video list in various locations
+            video_list = []
+            if isinstance(data, dict):
+                # Try common response structures
+                for key in ["data", "item_list", "items", "video_list"]:
+                    if key in data and isinstance(data[key], list):
+                        video_list = data[key]
+                        break
+                # Nested: data.data, data.item_list, etc.
+                if not video_list and "data" in data and isinstance(data["data"], dict):
+                    inner = data["data"]
+                    for key in ["item_list", "items", "video_list", "videos"]:
+                        if key in inner and isinstance(inner[key], list):
+                            video_list = inner[key]
+                            break
+
+            for item in video_list:
+                if not isinstance(item, dict):
+                    continue
+                # Extract video ID
+                vid_id = str(item.get("id", "") or item.get("video_id", "") or
+                            item.get("aweme_id", ""))
+                if not vid_id or len(vid_id) < 10:
+                    continue
+                # Extract caption/description
+                desc = (item.get("desc", "") or item.get("title", "") or
+                       item.get("caption", ""))
+                # Extract stats
+                stats = item.get("stats", {}) or item.get("statistics", {}) or {}
+                views = (stats.get("playCount", 0) or stats.get("play_count", 0) or
+                        item.get("play_count", 0) or 0)
+                likes = (stats.get("diggCount", 0) or stats.get("digg_count", 0) or
+                        item.get("digg_count", 0) or 0)
+                shares = (stats.get("shareCount", 0) or stats.get("share_count", 0) or 0)
+                comments = (stats.get("commentCount", 0) or stats.get("comment_count", 0) or 0)
+                # Extract author for URL
+                author = ""
+                author_info = item.get("author", {}) or {}
+                if isinstance(author_info, dict):
+                    author = (author_info.get("uniqueId", "") or
+                             author_info.get("unique_id", "") or
+                             author_info.get("nickname", ""))
+
+                vid_url = f"https://www.tiktok.com/@{author}/video/{vid_id}" if author else ""
+
+                api_videos[vid_id] = {
+                    "video_id": vid_id,
+                    "caption": desc,
+                    "views": int(views) if views else 0,
+                    "likes": int(likes) if likes else 0,
+                    "shares": int(shares) if shares else 0,
+                    "comments": int(comments) if comments else 0,
+                    "url": vid_url,
+                    "author": author,
+                }
+
+        except Exception:
+            pass  # Don't let API parsing errors break the scraper
 
     with sync_playwright() as p:
         context = p.chromium.launch_persistent_context(
@@ -762,59 +745,148 @@ def scrape_tiktok_by_caption(viral_caption, max_videos=50, scroll_count=10,
         )
         page = context.new_page()
 
+        # Set up API response interception
+        page.on("response", _handle_api_response)
+
         for qi, query in enumerate(search_queries):
             if len(results) >= max_videos:
                 break
 
-            for si, sort_param in enumerate(sort_filters):
-                if len(results) >= max_videos:
-                    break
+            api_videos_before = len(api_videos)
+            search_url = f"https://www.tiktok.com/search/video?q={quote(query)}"
+            print(f"\n   🔎  [Query {qi + 1}/{len(search_queries)}] \"{query[:50]}...\"")
 
-                search_url = f"https://www.tiktok.com/search/video?q={quote(query)}{sort_param}"
-                label = f"Query {qi + 1}/{len(search_queries)}, Sort {si + 1}/{len(sort_filters)}"
-                print(f"\n   🔎  [{label}] \"{query[:45]}...\"")
+            try:
+                page.goto(search_url, wait_until="domcontentloaded", timeout=30000)
+            except Exception as e:
+                print(f"   ⚠  Failed to load: {e}")
+                continue
 
-                try:
-                    page.goto(search_url, wait_until="domcontentloaded", timeout=30000)
-                except Exception as e:
-                    print(f"   ⚠  Failed to load: {e}")
-                    continue
+            time.sleep(random.uniform(4, 7))
+            _dismiss_popups(page)
+            time.sleep(random.uniform(1, 2))
 
-                time.sleep(random.uniform(3, 5))
-                _dismiss_popups(page)
-                time.sleep(random.uniform(1, 2))
+            # Scroll aggressively to trigger API pagination
+            prev_api_count = len(api_videos)
+            prev_dom_count = 0
+            stale_scrolls = 0
+            for i in range(scroll_count):
+                page.evaluate("window.scrollTo(0, document.body.scrollHeight)")
+                time.sleep(random.uniform(2.5, 4))
 
-                # Scroll to load results
-                _scroll_page(page, scroll_count)
+                dom_count = len(page.query_selector_all('a[href*="/video/"]'))
+                cur_api_count = len(api_videos)
+                new_api = cur_api_count - prev_api_count
+                print(f"   📜  Scroll {i + 1}/{scroll_count} — DOM: {dom_count} links, API: +{new_api} videos ({cur_api_count} total)")
 
-                # Extract and filter
-                video_data = _extract_video_cards(page)
-                json_captions = _extract_json_captions(page)
-
-                page_results, checked, matched, no_cap = _filter_extracted_videos(
-                    video_data, json_captions, page, viral_caption, match_threshold,
-                    min_views, seen_urls, max_videos - len(results),
-                )
-
-                results.extend(page_results)
-                total_checked += checked
-                total_matched += matched
-                total_no_caption += no_cap
-
-                if page_results:
-                    print(f"   ✅  +{len(page_results)} new matches (total: {len(results)})")
+                # Check if we're getting new content from either source
+                if dom_count <= prev_dom_count and cur_api_count <= prev_api_count:
+                    stale_scrolls += 1
+                    if stale_scrolls >= 3:
+                        print(f"   ⏹  No new content loading, stopping scrolls")
+                        break
                 else:
-                    print(f"   —  No new matches from this search")
+                    stale_scrolls = 0
 
-                # Small delay between searches to avoid rate limits
-                if qi < len(search_queries) - 1 or si < len(sort_filters) - 1:
-                    time.sleep(random.uniform(2, 4))
+                prev_dom_count = dom_count
+                prev_api_count = cur_api_count
+
+            api_videos_gained = len(api_videos) - api_videos_before
+            print(f"   📡  API captured {api_videos_gained} videos from this query")
+
+            # Also extract from DOM + embedded JSON as fallback
+            dom_data = _extract_video_cards(page)
+            json_data = _extract_json_captions(page)
+
+            # Merge JSON data into api_videos (API data takes priority)
+            for vid_id, info in (json_data or {}).items():
+                if vid_id not in api_videos:
+                    api_videos[vid_id] = {
+                        "video_id": vid_id,
+                        "caption": info.get("caption", ""),
+                        "views": info.get("views", 0),
+                        "likes": info.get("likes", 0),
+                        "shares": 0,
+                        "comments": 0,
+                        "url": "",
+                        "author": "",
+                    }
+
+            # Merge DOM data — use DOM URLs to fill in missing author URLs
+            for item in (dom_data or []):
+                href = item.get("href", "")
+                vid_match = re.search(r'/video/(\d+)', href)
+                if not vid_match:
+                    continue
+                vid_id = vid_match.group(1)
+                full_url = href if href.startswith("http") else f"https://www.tiktok.com{href}"
+                if vid_id in api_videos:
+                    if not api_videos[vid_id]["url"]:
+                        api_videos[vid_id]["url"] = full_url
+                else:
+                    dom_caption = item.get("caption", "")
+                    api_videos[vid_id] = {
+                        "video_id": vid_id,
+                        "caption": dom_caption,
+                        "views": parse_count(item.get("views", "")),
+                        "likes": 0,
+                        "shares": 0,
+                        "comments": 0,
+                        "url": full_url,
+                        "author": "",
+                    }
+
+            # Small delay between searches
+            if qi < len(search_queries) - 1:
+                time.sleep(random.uniform(2, 4))
 
         context.close()
 
-    if total_no_caption > 0:
-        print(f"\n   ⚠  {total_no_caption}/{total_checked} videos had no extractable caption — accepted via search trust")
-    print(f"   ✅  Total: checked {total_checked}, matched {total_matched}")
+    # Now filter ALL collected videos against the viral caption
+    print(f"\n   🔬  Filtering {len(api_videos)} unique videos against caption...")
+
+    for vid_id, info in api_videos.items():
+        caption = info.get("caption", "")
+        views = info.get("views", 0)
+        likes = info.get("likes", 0)
+        url = info.get("url", "")
+
+        if not url:
+            url = f"https://www.tiktok.com/@_/video/{vid_id}"
+
+        if url in seen_urls or vid_id in seen_video_ids:
+            continue
+
+        total_checked += 1
+        has_caption = bool(caption and len(caption.strip()) > 5)
+
+        if has_caption:
+            if not _caption_matches(caption, viral_caption, match_threshold):
+                continue
+        else:
+            # No caption extracted — skip (we can't verify it matches)
+            continue
+
+        if min_views and views > 0 and views < min_views:
+            continue
+
+        seen_urls.add(url)
+        seen_video_ids.add(vid_id)
+        total_matched += 1
+        results.append({
+            "url": url,
+            "views": views,
+            "likes": likes,
+            "shares": info.get("shares", 0),
+            "comments": info.get("comments", 0),
+            "keyword": "viral_caption",
+            "caption": caption[:100],
+        })
+
+        if len(results) >= max_videos:
+            break
+
+    print(f"   ✅  Total: {len(api_videos)} unique videos found, {total_checked} had captions, {total_matched} matched")
     return results
 
 
