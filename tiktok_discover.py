@@ -469,28 +469,289 @@ def _caption_matches(caption_text, target_caption, threshold=0.5):
     return ratio >= threshold
 
 
+def _build_search_queries(viral_caption):
+    """
+    Build multiple search query variations from a viral caption.
+    TikTok search returns different results for different phrasings,
+    so we cast a wider net by trying several slices of the caption.
+    """
+    queries = []
+    words = viral_caption.split()
+
+    # Full caption (first 80 chars) — primary search
+    queries.append(viral_caption[:80].strip())
+
+    # First half of caption
+    if len(words) > 6:
+        half = " ".join(words[:len(words) // 2])
+        if half != queries[0]:
+            queries.append(half[:80].strip())
+
+    # Second half of caption
+    if len(words) > 6:
+        second = " ".join(words[len(words) // 2:])
+        if second not in queries:
+            queries.append(second[:80].strip())
+
+    # Key phrase — middle chunk (often the most distinctive part)
+    if len(words) > 10:
+        mid_start = len(words) // 4
+        mid_end = mid_start + len(words) // 2
+        mid = " ".join(words[mid_start:mid_end])
+        if mid not in queries:
+            queries.append(mid[:80].strip())
+
+    return queries
+
+
+def _extract_video_cards(page):
+    """Extract video card data from the DOM."""
+    return page.evaluate("""() => {
+        const results = [];
+        const cards = document.querySelectorAll(
+            'div[data-e2e="search-card-container"], ' +
+            'div[data-e2e="search_video-item"], ' +
+            'div[class*="DivItemContainer"], ' +
+            'div[class*="VideoCard"], ' +
+            'div[class*="video-feed-item"], ' +
+            'div[class*="DivWrapper"], ' +
+            'div[class*="search-card"], ' +
+            'li[class*="video"]'
+        );
+
+        if (cards.length > 0) {
+            for (const card of cards) {
+                const link = card.querySelector('a[href*="/video/"]');
+                if (!link) continue;
+                const href = link.href || '';
+                const descEl = card.querySelector(
+                    '[data-e2e="search-card-desc"], ' +
+                    '[data-e2e="video-desc"], ' +
+                    '[class*="SpanText"], ' +
+                    '[class*="video-desc"], ' +
+                    '[class*="caption"], ' +
+                    '[class*="DivContainer"] span, ' +
+                    'a[title]'
+                );
+                let caption = descEl ? descEl.textContent.trim() :
+                                (link.title || link.getAttribute('title') || '');
+                if (!caption) {
+                    caption = card.textContent.trim().substring(0, 300);
+                }
+                const strongEls = card.querySelectorAll('strong, span');
+                let views = '';
+                for (const el of strongEls) {
+                    const t = el.textContent.trim();
+                    if (/^[\\d.]+[KMB]?$/i.test(t) && t.length <= 10) {
+                        views = t;
+                        break;
+                    }
+                }
+                results.push({href, caption, views});
+            }
+        }
+
+        if (results.length === 0) {
+            const links = document.querySelectorAll('a[href*="/video/"]');
+            for (const link of links) {
+                const href = link.href || '';
+                const caption = link.title || link.getAttribute('title') ||
+                               link.textContent.trim().substring(0, 300) || '';
+                results.push({href, caption, views: ''});
+            }
+        }
+        return results;
+    }""")
+
+
+def _extract_json_captions(page):
+    """Try to extract captions from TikTok's embedded JSON data."""
+    return page.evaluate("""() => {
+        const data = {};
+        for (const key of ['__UNIVERSAL_DATA_FOR_REHYDRATION__', 'SIGI_STATE', '__NEXT_DATA__']) {
+            try {
+                const obj = window[key];
+                if (!obj) continue;
+                const str = JSON.stringify(obj);
+                const idMatches = [...str.matchAll(/"id"\\s*:\\s*"(\\d{15,})"/g)];
+                for (const m of idMatches) {
+                    const vidId = m[1];
+                    const idx = str.indexOf('"' + vidId + '"');
+                    if (idx === -1) continue;
+                    const chunk = str.substring(idx, idx + 2000);
+                    const desc = chunk.match(/"desc"\\s*:\\s*"([^"]{10,})"/);
+                    const pc = chunk.match(/"playCount"\\s*[:]\\s*"?(\\d+)"?/);
+                    const dc = chunk.match(/"diggCount"\\s*[:]\\s*"?(\\d+)"?/);
+                    if (desc) {
+                        data[vidId] = {
+                            caption: desc[1],
+                            views: pc ? parseInt(pc[1]) : 0,
+                            likes: dc ? parseInt(dc[1]) : 0,
+                        };
+                    }
+                }
+            } catch(e) {}
+        }
+        return data;
+    }""")
+
+
+def _filter_extracted_videos(video_data, json_captions, page, viral_caption,
+                             match_threshold, min_views, seen_urls, max_videos):
+    """
+    Filter extracted video data. Returns (results, checked, matched, no_caption_count).
+    """
+    results = []
+    checked = 0
+    matched = 0
+    no_caption_count = 0
+
+    for item in (video_data or []):
+        href = item.get("href", "")
+        caption = item.get("caption", "")
+        views_str = item.get("views", "")
+
+        if not href or "/video/" not in href:
+            continue
+
+        vid_match = re.search(r'/video/(\d+)', href)
+        if not vid_match:
+            continue
+
+        video_id = vid_match.group(1)
+        full_url = href if href.startswith("http") else f"https://www.tiktok.com{href}"
+
+        json_info = (json_captions or {}).get(video_id, {})
+        if json_info.get("caption") and len(json_info["caption"]) > len(caption):
+            caption = json_info["caption"]
+
+        views = json_info.get("views", 0) or parse_count(views_str)
+        likes = json_info.get("likes", 0)
+
+        checked += 1
+
+        if full_url in seen_urls:
+            continue
+
+        has_caption = bool(caption and len(caption.strip()) > 5)
+        if has_caption:
+            if not _caption_matches(caption, viral_caption, match_threshold):
+                continue
+        else:
+            no_caption_count += 1
+
+        if min_views and views > 0 and views < min_views:
+            continue
+
+        seen_urls.add(full_url)
+        matched += 1
+        results.append({
+            "url": full_url,
+            "views": views,
+            "likes": likes,
+            "shares": 0,
+            "comments": 0,
+            "keyword": "viral_caption",
+            "caption": caption[:100] if has_caption else "(from search)",
+        })
+
+        if len(results) >= max_videos:
+            break
+
+    # Also check JSON-only videos not in DOM
+    for video_id, info in (json_captions or {}).items():
+        if len(results) >= max_videos:
+            break
+        url = f"https://www.tiktok.com/@_/video/{video_id}"
+        if url in seen_urls:
+            continue
+        caption = info.get("caption", "")
+        views = info.get("views", 0)
+        likes = info.get("likes", 0)
+        checked += 1
+
+        if not _caption_matches(caption, viral_caption, match_threshold):
+            continue
+        if min_views and views > 0 and views < min_views:
+            continue
+
+        try:
+            real_link = page.query_selector(f'a[href*="/video/{video_id}"]')
+            if real_link:
+                real_href = real_link.get_attribute("href") or ""
+                if real_href.startswith("http"):
+                    url = real_href
+                elif real_href.startswith("/"):
+                    url = "https://www.tiktok.com" + real_href
+        except Exception:
+            pass
+
+        seen_urls.add(url)
+        matched += 1
+        results.append({
+            "url": url,
+            "views": views,
+            "likes": likes,
+            "shares": 0,
+            "comments": 0,
+            "keyword": "viral_caption",
+            "caption": caption[:100],
+        })
+
+    return results, checked, matched, no_caption_count
+
+
+def _scroll_page(page, scroll_count):
+    """Scroll the page to load more results. Returns total link count."""
+    prev_count = 0
+    stale_scrolls = 0
+    for i in range(scroll_count):
+        page.evaluate("window.scrollTo(0, document.body.scrollHeight)")
+        time.sleep(random.uniform(2, 3.5))
+        cur_count = len(page.query_selector_all('a[href*="/video/"]'))
+        print(f"   📜  Scroll {i + 1}/{scroll_count} ({cur_count} links)")
+        if cur_count <= prev_count:
+            stale_scrolls += 1
+            if stale_scrolls >= 2:
+                print(f"   ⏹  No new videos loading, stopping early")
+                break
+        else:
+            stale_scrolls = 0
+        prev_count = cur_count
+    return prev_count
+
+
 def scrape_tiktok_by_caption(viral_caption, max_videos=50, scroll_count=10,
                               headless=True, min_views=0, match_threshold=0.5):
     """
-    Search TikTok for the viral caption text and return only videos
-    whose captions match. This filters for videos using the same viral
-    copy-paste caption — a strong signal they're decent content.
-
-    Returns list of dicts: [{"url": str, "views": int, "caption": str, ...}]
+    Search TikTok for the viral caption text using multiple query variations
+    and sort tabs to maximize results. Returns list of matching video dicts.
     """
     from playwright.sync_api import sync_playwright
+    from urllib.parse import quote
 
-    # Use first ~60 chars of caption as search query (TikTok search has limits)
-    search_query = viral_caption[:80].strip()
     results = []
     seen_urls = set()
+    total_checked = 0
+    total_matched = 0
+    total_no_caption = 0
 
     has_profile = os.path.exists(BROWSER_PROFILE_DIR)
     if not has_profile:
         print("   ⚠  No saved TikTok session found. Run with --login first.")
         return results
 
-    print(f"\n🔍  Caption search: \"{search_query[:50]}...\"")
+    # Build multiple search queries from the caption
+    search_queries = _build_search_queries(viral_caption)
+
+    # TikTok search sort tabs — each surfaces different results
+    sort_filters = [
+        "",                          # Default/relevance
+        "&sort_by=0",                # Relevance (explicit)
+        "&sort_by=1",                # Most liked
+    ]
+
+    print(f"\n🔍  Caption search with {len(search_queries)} query variations × {len(sort_filters)} sort modes")
 
     with sync_playwright() as p:
         context = p.chromium.launch_persistent_context(
@@ -501,240 +762,59 @@ def scrape_tiktok_by_caption(viral_caption, max_videos=50, scroll_count=10,
         )
         page = context.new_page()
 
-        # Search TikTok for the caption text
-        from urllib.parse import quote
-        url = f"https://www.tiktok.com/search/video?q={quote(search_query)}"
+        for qi, query in enumerate(search_queries):
+            if len(results) >= max_videos:
+                break
 
-        try:
-            page.goto(url, wait_until="domcontentloaded", timeout=30000)
-        except Exception as e:
-            print(f"   ⚠  Failed to load search page: {e}")
-            context.close()
-            return results
-
-        time.sleep(random.uniform(4, 7))
-        _dismiss_popups(page)
-        time.sleep(random.uniform(1, 2))
-
-        # Scroll to load results
-        prev_count = 0
-        stale_scrolls = 0
-        for i in range(scroll_count):
-            page.evaluate("window.scrollTo(0, document.body.scrollHeight)")
-            time.sleep(random.uniform(2, 3.5))
-            cur_count = len(page.query_selector_all('a[href*="/video/"]'))
-            print(f"   📜  Scroll {i + 1}/{scroll_count} ({cur_count} links)")
-            if cur_count <= prev_count:
-                stale_scrolls += 1
-                if stale_scrolls >= 2:
-                    print(f"   ⏹  No new videos loading, stopping early")
+            for si, sort_param in enumerate(sort_filters):
+                if len(results) >= max_videos:
                     break
-            else:
-                stale_scrolls = 0
-            prev_count = cur_count
 
-        # Extract video cards with their captions
-        video_data = page.evaluate("""() => {
-            const results = [];
-            // Try multiple container selectors — TikTok changes these often
-            const cards = document.querySelectorAll(
-                'div[data-e2e="search-card-container"], ' +
-                'div[data-e2e="search_video-item"], ' +
-                'div[class*="DivItemContainer"], ' +
-                'div[class*="VideoCard"], ' +
-                'div[class*="video-feed-item"], ' +
-                'div[class*="DivWrapper"], ' +
-                'div[class*="search-card"], ' +
-                'li[class*="video"]'
-            );
+                search_url = f"https://www.tiktok.com/search/video?q={quote(query)}{sort_param}"
+                label = f"Query {qi + 1}/{len(search_queries)}, Sort {si + 1}/{len(sort_filters)}"
+                print(f"\n   🔎  [{label}] \"{query[:45]}...\"")
 
-            // If structured cards found, parse them
-            if (cards.length > 0) {
-                for (const card of cards) {
-                    const link = card.querySelector('a[href*="/video/"]');
-                    if (!link) continue;
-                    const href = link.href || '';
-                    // Try many selectors for caption — TikTok changes these
-                    const descEl = card.querySelector(
-                        '[data-e2e="search-card-desc"], ' +
-                        '[data-e2e="video-desc"], ' +
-                        '[class*="SpanText"], ' +
-                        '[class*="video-desc"], ' +
-                        '[class*="caption"], ' +
-                        '[class*="DivContainer"] span, ' +
-                        'a[title]'
-                    );
-                    let caption = descEl ? descEl.textContent.trim() :
-                                    (link.title || link.getAttribute('title') || '');
-                    // Fallback: grab all text from the card if caption is empty
-                    if (!caption) {
-                        caption = card.textContent.trim().substring(0, 300);
-                    }
-                    // Get view count
-                    const strongEls = card.querySelectorAll('strong, span');
-                    let views = '';
-                    for (const el of strongEls) {
-                        const t = el.textContent.trim();
-                        if (/^[\\d.]+[KMB]?$/i.test(t) && t.length <= 10) {
-                            views = t;
-                            break;
-                        }
-                    }
-                    results.push({href, caption, views});
-                }
-            }
-
-            // Fallback: just grab all video links on the page
-            if (results.length === 0) {
-                const links = document.querySelectorAll('a[href*="/video/"]');
-                for (const link of links) {
-                    const href = link.href || '';
-                    const caption = link.title || link.getAttribute('title') ||
-                                   link.textContent.trim().substring(0, 300) || '';
-                    results.push({href, caption, views: ''});
-                }
-            }
-            return results;
-        }""")
-
-        # Also try extracting captions from embedded JSON
-        json_captions = page.evaluate("""() => {
-            const data = {};
-            for (const key of ['__UNIVERSAL_DATA_FOR_REHYDRATION__', 'SIGI_STATE', '__NEXT_DATA__']) {
-                try {
-                    const obj = window[key];
-                    if (!obj) continue;
-                    const str = JSON.stringify(obj);
-                    const idMatches = [...str.matchAll(/"id"\\s*:\\s*"(\\d{15,})"/g)];
-                    for (const m of idMatches) {
-                        const vidId = m[1];
-                        const idx = str.indexOf('"' + vidId + '"');
-                        if (idx === -1) continue;
-                        const chunk = str.substring(idx, idx + 2000);
-                        const desc = chunk.match(/"desc"\\s*:\\s*"([^"]{10,})"/);
-                        const pc = chunk.match(/"playCount"\\s*[:]\\s*"?(\\d+)"?/);
-                        const dc = chunk.match(/"diggCount"\\s*[:]\\s*"?(\\d+)"?/);
-                        if (desc) {
-                            data[vidId] = {
-                                caption: desc[1],
-                                views: pc ? parseInt(pc[1]) : 0,
-                                likes: dc ? parseInt(dc[1]) : 0,
-                            };
-                        }
-                    }
-                } catch(e) {}
-            }
-            return data;
-        }""")
-
-        matched = 0
-        checked = 0
-        no_caption_count = 0
-
-        # Process DOM-extracted cards
-        for item in (video_data or []):
-            href = item.get("href", "")
-            caption = item.get("caption", "")
-            views_str = item.get("views", "")
-
-            if not href or "/video/" not in href:
-                continue
-
-            vid_match = re.search(r'/video/(\d+)', href)
-            if not vid_match:
-                continue
-
-            video_id = vid_match.group(1)
-            full_url = href if href.startswith("http") else f"https://www.tiktok.com{href}"
-
-            # Check JSON data for richer caption if DOM caption is sparse
-            json_info = (json_captions or {}).get(video_id, {})
-            if json_info.get("caption") and len(json_info["caption"]) > len(caption):
-                caption = json_info["caption"]
-
-            views = json_info.get("views", 0) or parse_count(views_str)
-            likes = json_info.get("likes", 0)
-
-            checked += 1
-
-            if full_url in seen_urls:
-                continue
-
-            # Filter: match the viral caption
-            # If we can't extract captions at all, trust TikTok's search results
-            # (we already searched for the caption text, so results are relevant)
-            has_caption = bool(caption and len(caption.strip()) > 5)
-            if has_caption:
-                if not _caption_matches(caption, viral_caption, match_threshold):
+                try:
+                    page.goto(search_url, wait_until="domcontentloaded", timeout=30000)
+                except Exception as e:
+                    print(f"   ⚠  Failed to load: {e}")
                     continue
-            else:
-                no_caption_count += 1
 
-            # Filter: minimum views
-            if min_views and views > 0 and views < min_views:
-                continue
+                time.sleep(random.uniform(3, 5))
+                _dismiss_popups(page)
+                time.sleep(random.uniform(1, 2))
 
-            seen_urls.add(full_url)
-            matched += 1
-            results.append({
-                "url": full_url,
-                "views": views,
-                "likes": likes,
-                "shares": 0,
-                "comments": 0,
-                "keyword": "viral_caption",
-                "caption": caption[:100] if has_caption else "(from search)",
-            })
+                # Scroll to load results
+                _scroll_page(page, scroll_count)
 
-            if len(results) >= max_videos:
-                break
+                # Extract and filter
+                video_data = _extract_video_cards(page)
+                json_captions = _extract_json_captions(page)
 
-        # Also check JSON-only videos not found in DOM
-        for video_id, info in (json_captions or {}).items():
-            url = f"https://www.tiktok.com/@_/video/{video_id}"
-            if url in seen_urls:
-                continue
-            caption = info.get("caption", "")
-            views = info.get("views", 0)
-            likes = info.get("likes", 0)
-            checked += 1
+                page_results, checked, matched, no_cap = _filter_extracted_videos(
+                    video_data, json_captions, page, viral_caption, match_threshold,
+                    min_views, seen_urls, max_videos - len(results),
+                )
 
-            if not _caption_matches(caption, viral_caption, match_threshold):
-                continue
-            if min_views and views > 0 and views < min_views:
-                continue
+                results.extend(page_results)
+                total_checked += checked
+                total_matched += matched
+                total_no_caption += no_cap
 
-            # Try to get real URL
-            try:
-                real_link = page.query_selector(f'a[href*="/video/{video_id}"]')
-                if real_link:
-                    real_href = real_link.get_attribute("href") or ""
-                    if real_href.startswith("http"):
-                        url = real_href
-                    elif real_href.startswith("/"):
-                        url = "https://www.tiktok.com" + real_href
-            except Exception:
-                pass
+                if page_results:
+                    print(f"   ✅  +{len(page_results)} new matches (total: {len(results)})")
+                else:
+                    print(f"   —  No new matches from this search")
 
-            seen_urls.add(url)
-            matched += 1
-            results.append({
-                "url": url,
-                "views": views,
-                "likes": likes,
-                "shares": 0,
-                "comments": 0,
-                "keyword": "viral_caption",
-                "caption": caption[:100],
-            })
-            if len(results) >= max_videos:
-                break
+                # Small delay between searches to avoid rate limits
+                if qi < len(search_queries) - 1 or si < len(sort_filters) - 1:
+                    time.sleep(random.uniform(2, 4))
 
         context.close()
 
-    if no_caption_count > 0:
-        print(f"   ⚠  {no_caption_count}/{checked} videos had no extractable caption — accepted via search trust")
-    print(f"   ✅  Checked {checked} videos, {matched} matched the viral caption")
+    if total_no_caption > 0:
+        print(f"\n   ⚠  {total_no_caption}/{total_checked} videos had no extractable caption — accepted via search trust")
+    print(f"   ✅  Total: checked {total_checked}, matched {total_matched}")
     return results
 
 
