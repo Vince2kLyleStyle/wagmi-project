@@ -449,24 +449,62 @@ def _extract_videos(page, keyword, min_views, min_likes, min_engagement_ratio=0.
     return results
 
 
+def _extract_key_phrases(text):
+    """Extract distinctive words from caption, ignoring noise."""
+    import string
+    # Remove emojis, hashtags, mentions, and common noise
+    cleaned = re.sub(r'[^\x00-\x7F]+', ' ', text)  # Strip emojis/unicode
+    cleaned = re.sub(r'#\w+', ' ', cleaned)          # Strip hashtags
+    cleaned = re.sub(r'@\w+', ' ', cleaned)          # Strip mentions
+    cleaned = cleaned.lower()
+    cleaned = cleaned.translate(str.maketrans('', '', string.punctuation))
+    # Remove common filler words
+    noise = {'the', 'a', 'an', 'is', 'are', 'was', 'were', 'in', 'on', 'at',
+             'to', 'for', 'of', 'and', 'or', 'but', 'its', 'it', 'this', 'that',
+             'by', 'from', 'with', 'as', 'be', 'has', 'have', 'had', 'do', 'does',
+             'ctto', 'credit', 'credits', 'via', 'fy', 'fyp', 'foryou',
+             'foryoupage', 'viral', 'trending', 'edit', 'duet', 'stitch'}
+    words = [w for w in cleaned.split() if w and len(w) > 2 and w not in noise]
+    return set(words)
+
+
 def _caption_matches(caption_text, target_caption, threshold=0.5):
-    """Check if a video caption is similar enough to the target viral caption."""
+    """
+    Check if a video caption matches the target viral caption.
+    Uses keyword overlap on cleaned text (strips emojis, hashtags, mentions)
+    so copies with added noise still match.
+    """
     if not caption_text or not target_caption:
         return False
-    # Normalize both for comparison
-    cap = caption_text.lower().strip()
-    target = target_caption.lower().strip()
-    # Quick check: target words present in caption
-    target_words = set(target.split())
-    cap_words = set(cap.split())
-    if not target_words:
+
+    # Extract meaningful keywords from both
+    target_keys = _extract_key_phrases(target_caption)
+    cap_keys = _extract_key_phrases(caption_text)
+
+    if not target_keys:
         return False
-    overlap = len(target_words & cap_words) / len(target_words)
+
+    # How many of the target's key phrases appear in the caption?
+    overlap = len(target_keys & cap_keys) / len(target_keys)
     if overlap >= threshold:
         return True
-    # Fallback: fuzzy ratio
-    ratio = SequenceMatcher(None, cap[:len(target)*2], target).ratio()
-    return ratio >= threshold
+
+    # Fallback: check if the core of the caption appears as a substring
+    # (handles cases where the whole caption is copy-pasted with prefix/suffix noise)
+    target_clean = re.sub(r'[^\w\s]', '', target_caption.lower()).strip()
+    cap_clean = re.sub(r'[^\w\s]', '', caption_text.lower()).strip()
+
+    # Check if a significant chunk of target appears in caption
+    # Use a sliding window of target words
+    target_words = target_clean.split()
+    if len(target_words) >= 5:
+        # Check if any 5-word sequence from target appears in caption
+        for i in range(len(target_words) - 4):
+            phrase = ' '.join(target_words[i:i+5])
+            if phrase in cap_clean:
+                return True
+
+    return False
 
 
 def _build_search_queries(viral_caption):
@@ -779,20 +817,36 @@ def scrape_tiktok_by_caption(viral_caption, max_videos=50, scroll_count=10,
                     _dismiss_popups(page)
                     time.sleep(random.uniform(1, 2))
 
-                    # Scroll to trigger API pagination
+                    # Scroll to trigger API pagination + try "Load more" buttons
                     prev_api_count = len(api_videos)
                     prev_dom_count = 0
                     stale_scrolls = 0
                     for i in range(scroll_count):
+                        # Scroll down
                         page.evaluate("window.scrollTo(0, document.body.scrollHeight)")
-                        time.sleep(random.uniform(2, 3.5))
+                        time.sleep(random.uniform(1.5, 3))
+
+                        # Try clicking "Load more" type buttons
+                        try:
+                            load_more = page.query_selector(
+                                'button:has-text("Load more"), '
+                                'button:has-text("load more"), '
+                                'div[class*="LoadMore"], '
+                                'button[class*="more"], '
+                                'div[class*="pagination"] button'
+                            )
+                            if load_more:
+                                load_more.click()
+                                time.sleep(random.uniform(2, 3))
+                        except Exception:
+                            pass
 
                         dom_count = len(page.query_selector_all('a[href*="/video/"]'))
                         cur_api_count = len(api_videos)
 
                         if dom_count <= prev_dom_count and cur_api_count <= prev_api_count:
                             stale_scrolls += 1
-                            if stale_scrolls >= 2:
+                            if stale_scrolls >= 3:
                                 break
                         else:
                             stale_scrolls = 0
@@ -837,10 +891,10 @@ def scrape_tiktok_by_caption(viral_caption, max_videos=50, scroll_count=10,
                             }
 
                     gained = len(api_videos) - api_before
-                    print(f"   📡  +{gained} new videos (pool: {len(api_videos)} unique)")
+                    print(f"   📡  +{gained} new ({len(api_videos)} total in pool)")
 
                     # Brief delay between searches
-                    time.sleep(random.uniform(1.5, 3))
+                    time.sleep(random.uniform(1, 2.5))
 
         context.close()
 

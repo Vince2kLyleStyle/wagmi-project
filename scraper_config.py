@@ -36,9 +36,9 @@ VIRAL_CAPTION_SEARCH = (
     "Using piezoelectric tiles every step you take generates a small amount of energy"
 )
 # How much of the caption must match to count (0.0-1.0)
-CAPTION_MATCH_THRESHOLD = 0.5
+CAPTION_MATCH_THRESHOLD = 0.35
 MAX_VIDEOS_PER_KEYWORD = 200            # Videos to collect per keyword
-MIN_VIEWS = 1_000_000                  # Minimum view count — viral only
+MIN_VIEWS = 100_000                    # Minimum view count (lowered to catch more caption copies)
 MIN_LIKES = 0                          # Minimum like count (0 = no filter)
 MIN_ENGAGEMENT_RATIO = 0.05            # Min likes/views ratio (5% = genuinely good)
 SCROLL_COUNT = 25                      # Times to scroll for more results
