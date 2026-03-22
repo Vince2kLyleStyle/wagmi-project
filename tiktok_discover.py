@@ -536,38 +536,63 @@ def scrape_tiktok_by_caption(viral_caption, max_videos=50, scroll_count=10,
         # Extract video cards with their captions
         video_data = page.evaluate("""() => {
             const results = [];
+            // Try multiple container selectors — TikTok changes these often
             const cards = document.querySelectorAll(
                 'div[data-e2e="search-card-container"], ' +
+                'div[data-e2e="search_video-item"], ' +
                 'div[class*="DivItemContainer"], ' +
                 'div[class*="VideoCard"], ' +
                 'div[class*="video-feed-item"], ' +
-                'div[class*="DivWrapper"]'
+                'div[class*="DivWrapper"], ' +
+                'div[class*="search-card"], ' +
+                'li[class*="video"]'
             );
-            for (const card of cards) {
-                const link = card.querySelector('a[href*="/video/"]');
-                if (!link) continue;
-                const href = link.href || '';
-                // Get caption/description text from the card
-                const descEl = card.querySelector(
-                    'span[data-e2e="search-card-desc"], ' +
-                    'div[data-e2e="search-card-desc"], ' +
-                    'span[class*="SpanText"], ' +
-                    'div[class*="DivContainer"] span, ' +
-                    'a[title]'
-                );
-                const caption = descEl ? descEl.textContent.trim() :
-                                (link.title || link.getAttribute('title') || '');
-                // Get view count
-                const strongEls = card.querySelectorAll('strong, span');
-                let views = '';
-                for (const el of strongEls) {
-                    const t = el.textContent.trim();
-                    if (/^[\\d.]+[KMB]?$/i.test(t) && t.length <= 10) {
-                        views = t;
-                        break;
+
+            // If structured cards found, parse them
+            if (cards.length > 0) {
+                for (const card of cards) {
+                    const link = card.querySelector('a[href*="/video/"]');
+                    if (!link) continue;
+                    const href = link.href || '';
+                    // Try many selectors for caption — TikTok changes these
+                    const descEl = card.querySelector(
+                        '[data-e2e="search-card-desc"], ' +
+                        '[data-e2e="video-desc"], ' +
+                        '[class*="SpanText"], ' +
+                        '[class*="video-desc"], ' +
+                        '[class*="caption"], ' +
+                        '[class*="DivContainer"] span, ' +
+                        'a[title]'
+                    );
+                    let caption = descEl ? descEl.textContent.trim() :
+                                    (link.title || link.getAttribute('title') || '');
+                    // Fallback: grab all text from the card if caption is empty
+                    if (!caption) {
+                        caption = card.textContent.trim().substring(0, 300);
                     }
+                    // Get view count
+                    const strongEls = card.querySelectorAll('strong, span');
+                    let views = '';
+                    for (const el of strongEls) {
+                        const t = el.textContent.trim();
+                        if (/^[\\d.]+[KMB]?$/i.test(t) && t.length <= 10) {
+                            views = t;
+                            break;
+                        }
+                    }
+                    results.push({href, caption, views});
                 }
-                results.push({href, caption, views});
+            }
+
+            // Fallback: just grab all video links on the page
+            if (results.length === 0) {
+                const links = document.querySelectorAll('a[href*="/video/"]');
+                for (const link of links) {
+                    const href = link.href || '';
+                    const caption = link.title || link.getAttribute('title') ||
+                                   link.textContent.trim().substring(0, 300) || '';
+                    results.push({href, caption, views: ''});
+                }
             }
             return results;
         }""")
@@ -604,6 +629,7 @@ def scrape_tiktok_by_caption(viral_caption, max_videos=50, scroll_count=10,
 
         matched = 0
         checked = 0
+        no_caption_count = 0
 
         # Process DOM-extracted cards
         for item in (video_data or []):
@@ -634,9 +660,15 @@ def scrape_tiktok_by_caption(viral_caption, max_videos=50, scroll_count=10,
             if full_url in seen_urls:
                 continue
 
-            # Filter: must match the viral caption
-            if not _caption_matches(caption, viral_caption, match_threshold):
-                continue
+            # Filter: match the viral caption
+            # If we can't extract captions at all, trust TikTok's search results
+            # (we already searched for the caption text, so results are relevant)
+            has_caption = bool(caption and len(caption.strip()) > 5)
+            if has_caption:
+                if not _caption_matches(caption, viral_caption, match_threshold):
+                    continue
+            else:
+                no_caption_count += 1
 
             # Filter: minimum views
             if min_views and views > 0 and views < min_views:
@@ -651,7 +683,7 @@ def scrape_tiktok_by_caption(viral_caption, max_videos=50, scroll_count=10,
                 "shares": 0,
                 "comments": 0,
                 "keyword": "viral_caption",
-                "caption": caption[:100],
+                "caption": caption[:100] if has_caption else "(from search)",
             })
 
             if len(results) >= max_videos:
@@ -700,6 +732,8 @@ def scrape_tiktok_by_caption(viral_caption, max_videos=50, scroll_count=10,
 
         context.close()
 
+    if no_caption_count > 0:
+        print(f"   ⚠  {no_caption_count}/{checked} videos had no extractable caption — accepted via search trust")
     print(f"   ✅  Checked {checked} videos, {matched} matched the viral caption")
     return results
 
