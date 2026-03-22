@@ -17,7 +17,7 @@ import sys
 from datetime import datetime
 
 import scraper_config as cfg
-from tiktok_discover import scrape_tiktok, login_to_tiktok
+from tiktok_discover import scrape_tiktok, login_to_tiktok, scrape_tiktok_by_caption
 from telegram_sender import send_urls_sync, send_and_download_sync, telegram_login_sync
 
 BANNER = """
@@ -174,6 +174,14 @@ def main():
         help="Show browser window"
     )
     parser.add_argument(
+        "--caption-search", action="store_true",
+        help="Search for videos using the viral caption instead of keywords"
+    )
+    parser.add_argument(
+        "--caption", type=str, default=None,
+        help="Custom viral caption to search for (default: uses config)"
+    )
+    parser.add_argument(
         "-o", "--output", default=cfg.OUTPUT_FILE,
         help=f"URL log file (default: {cfg.OUTPUT_FILE})"
     )
@@ -197,6 +205,61 @@ def main():
             print(f"    {name:15s} → {', '.join(kws[:5])}{'...' if len(kws) > 5 else ''}")
         print(f"\n  Usage:  py tiktok_scraper.py --niche {list(cfg.NICHES.keys())[0]}")
         print(f"  All:    py tiktok_scraper.py --niche {' '.join(cfg.NICHES.keys())}")
+        sys.exit(0)
+
+    # ─── Caption search mode ─────────────────────────────────────
+    if args.caption_search:
+        caption = args.caption or cfg.VIRAL_CAPTION_SEARCH
+        if not caption:
+            print("  ❌  No viral caption configured.")
+            print("  Set VIRAL_CAPTION_SEARCH in scraper_config.py or use --caption \"...\"")
+            sys.exit(1)
+
+        niche_name = args.niche[0] if args.niche else "memes"
+        download_dir = os.path.join(cfg.DOWNLOAD_DIR, niche_name)
+
+        print(f"  Mode:         CAPTION SEARCH")
+        print(f"  Caption:      \"{caption[:60]}...\"")
+        print(f"  Niche:        {niche_name}")
+        print(f"  Download to:  {download_dir}")
+        print()
+
+        existing = load_existing_urls(args.output)
+        results = scrape_tiktok_by_caption(
+            viral_caption=caption,
+            max_videos=args.max,
+            scroll_count=args.scrolls,
+            headless=not args.no_headless,
+            min_views=args.min_views,
+            match_threshold=cfg.CAPTION_MATCH_THRESHOLD,
+        )
+
+        new_results = [r for r in results if r["url"] not in existing]
+        print(f"\n  📊  {len(results)} matched, {len(new_results)} new")
+
+        if new_results:
+            save_urls(new_results, args.output)
+            for r in new_results[:10]:
+                views = f"{r['views']:>10,}" if r["views"] else "   unknown"
+                cap_preview = r.get("caption", "")[:40]
+                print(f"  {views} views | {cap_preview}...")
+            if len(new_results) > 10:
+                print(f"  ... and {len(new_results) - 10} more")
+
+            if not args.no_telegram:
+                urls = [r["url"] for r in new_results]
+                if args.no_download:
+                    sent, failed = send_urls_sync(urls)
+                    print(f"  📱  Sent {sent}, failed {failed}")
+                else:
+                    sent, downloaded, failed = send_and_download_sync(
+                        urls, download_dir=download_dir
+                    )
+                    print(f"  📱  Sent {sent}, downloaded {downloaded}, failed {failed}")
+
+        print(f"\n{'═' * 54}")
+        print(f"  DONE! {len(new_results)} new videos from caption search.")
+        print(f"{'═' * 54}\n")
         sys.exit(0)
 
     # ─── Determine what to scrape ────────────────────────────────

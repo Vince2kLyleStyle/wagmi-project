@@ -27,6 +27,16 @@ NICHES = {
         "perfectly cut screams", "unexpected ending",
     ],
 }
+
+# ─── Viral Caption Search ────────────────────────────────────────────
+# Search TikTok for videos using this exact viral caption.
+# Videos with the same caption are pre-filtered quality content.
+VIRAL_CAPTION_SEARCH = (
+    "Japan is turning footsteps into electricity "
+    "Using piezoelectric tiles every step you take generates a small amount of energy"
+)
+# How much of the caption must match to count (0.0-1.0)
+CAPTION_MATCH_THRESHOLD = 0.5
 MAX_VIDEOS_PER_KEYWORD = 50            # Videos to collect per keyword
 MIN_VIEWS = 1_000_000                  # Minimum view count — viral only
 MIN_LIKES = 0                          # Minimum like count (0 = no filter)
