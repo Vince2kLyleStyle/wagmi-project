@@ -135,13 +135,18 @@ def scrape_tiktok(keywords, max_per_keyword=20, min_views=0, min_likes=0,
             stale_scrolls = 0
             for i in range(scroll_count):
                 page.evaluate("window.scrollTo(0, document.body.scrollHeight)")
-                time.sleep(random.uniform(2, 3.5))
+                time.sleep(random.uniform(3, 5))
+                # Nudge scroll up then back down to trigger lazy loading
+                page.evaluate("window.scrollBy(0, -300)")
+                time.sleep(random.uniform(0.5, 1))
+                page.evaluate("window.scrollTo(0, document.body.scrollHeight)")
+                time.sleep(random.uniform(1.5, 2.5))
                 # Check if new videos loaded
                 cur_count = len(page.query_selector_all('a[href*="/video/"]'))
                 print(f"   📜  Scroll {i + 1}/{scroll_count} ({cur_count} links)")
                 if cur_count <= prev_count:
                     stale_scrolls += 1
-                    if stale_scrolls >= 2:
+                    if stale_scrolls >= 4:
                         print(f"   ⏹  No new videos loading, stopping early")
                         break
                 else:
@@ -625,12 +630,16 @@ def _scroll_page(page, scroll_count):
     stale_scrolls = 0
     for i in range(scroll_count):
         page.evaluate("window.scrollTo(0, document.body.scrollHeight)")
-        time.sleep(random.uniform(2, 3.5))
+        time.sleep(random.uniform(3, 5))
+        page.evaluate("window.scrollBy(0, -300)")
+        time.sleep(random.uniform(0.5, 1))
+        page.evaluate("window.scrollTo(0, document.body.scrollHeight)")
+        time.sleep(random.uniform(1.5, 2.5))
         cur_count = len(page.query_selector_all('a[href*="/video/"]'))
         print(f"   📜  Scroll {i + 1}/{scroll_count} ({cur_count} links)")
         if cur_count <= prev_count:
             stale_scrolls += 1
-            if stale_scrolls >= 2:
+            if stale_scrolls >= 4:
                 print(f"   ⏹  No new videos loading, stopping early")
                 break
         else:

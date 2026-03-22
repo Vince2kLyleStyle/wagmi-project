@@ -11,6 +11,8 @@ load_dotenv()
 KEYWORDS = [                           # Default keywords (used when no niche specified)
     "shitpost", "brainrot", "low quality meme",
     "deep fried meme", "cursed video", "unhinged meme",
+    "perfectly cut screams", "meme that goes hard",
+    "earrape meme", "dank meme compilation",
 ]
 
 # ─── Niche Presets ────────────────────────────────────────────────────
@@ -22,6 +24,8 @@ NICHES = {
         "shitpost", "brainrot",
         "low quality meme", "deep fried meme",
         "cursed video", "unhinged meme",
+        "perfectly cut screams", "meme that goes hard",
+        "earrape meme", "dank meme compilation",
     ],
 }
 
