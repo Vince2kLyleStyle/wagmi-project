@@ -72,6 +72,7 @@ def run_niche(niche_name, keywords, args, existing_urls):
         scroll_count=args.scrolls,
         headless=not args.no_headless,
         min_engagement_ratio=args.min_engagement,
+        min_interactions=args.min_interactions,
     )
 
     if not results:
@@ -161,6 +162,10 @@ def main():
     parser.add_argument(
         "--scrolls", type=int, default=cfg.SCROLL_COUNT,
         help=f"Scroll count (default: {cfg.SCROLL_COUNT})"
+    )
+    parser.add_argument(
+        "--min-interactions", type=int, default=cfg.MIN_INTERACTIONS,
+        help=f"Min total interactions: likes+comments+shares (default: {cfg.MIN_INTERACTIONS:,})"
     )
     parser.add_argument(
         "--no-telegram", action="store_true",
@@ -337,6 +342,7 @@ def main():
             min_views=args.min_views,
             match_threshold=cfg.CAPTION_MATCH_THRESHOLD,
             skip_profiles=args.skip_profiles,
+            min_interactions=args.min_interactions,
         )
 
         new_results = [r for r in results if r["url"] not in existing]

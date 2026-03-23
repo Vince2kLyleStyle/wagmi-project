@@ -83,7 +83,8 @@ def login_to_tiktok():
 
 
 def scrape_tiktok(keywords, max_per_keyword=20, min_views=0, min_likes=0,
-                  scroll_count=5, headless=True, min_engagement_ratio=0.0):
+                  scroll_count=5, headless=True, min_engagement_ratio=0.0,
+                  min_interactions=0):
     """
     Scrape TikTok search results for given keywords.
 
@@ -154,7 +155,7 @@ def scrape_tiktok(keywords, max_per_keyword=20, min_views=0, min_likes=0,
                 prev_count = cur_count
 
             # Extract video links and metadata
-            videos = _extract_videos(page, keyword, min_views, min_likes, min_engagement_ratio)
+            videos = _extract_videos(page, keyword, min_views, min_likes, min_engagement_ratio, min_interactions)
 
             new_count = 0
             for vid in videos:
@@ -192,7 +193,7 @@ def scrape_tiktok(keywords, max_per_keyword=20, min_views=0, min_likes=0,
                                 stale_scrolls = 0
                             prev_count = cur_count
 
-                        liked_videos = _extract_videos(page, keyword, min_views, min_likes, min_engagement_ratio)
+                        liked_videos = _extract_videos(page, keyword, min_views, min_likes, min_engagement_ratio, min_interactions)
                         for vid in liked_videos:
                             if vid["url"] not in seen_urls and new_count < max_per_keyword:
                                 seen_urls.add(vid["url"])
@@ -227,7 +228,7 @@ def _dismiss_popups(page):
             pass
 
 
-def _extract_videos(page, keyword, min_views, min_likes, min_engagement_ratio=0.0):
+def _extract_videos(page, keyword, min_views, min_likes, min_engagement_ratio=0.0, min_interactions=0):
     """Extract video URLs, view counts, likes, and shares from the current page."""
     results = []
     seen_ids = set()
@@ -422,6 +423,12 @@ def _extract_videos(page, keyword, min_views, min_likes, min_engagement_ratio=0.
             ratio = likes / views
             if ratio < min_engagement_ratio:
                 skipped_engagement += 1
+                continue
+
+        # Apply minimum interactions filter (likes + comments + shares)
+        if min_interactions:
+            total_interactions = likes + comments + shares
+            if total_interactions > 0 and total_interactions < min_interactions:
                 continue
 
         # Reconstruct URL — we may not have the username, so use a redirect-friendly format
@@ -958,7 +965,7 @@ def scrape_tiktok_by_caption(viral_caption, max_videos=50, scroll_count=10,
 def scrape_accounts_from_captions(captions_list, max_account_videos=30,
                                    scroll_count=15, headless=True,
                                    min_views=0, match_threshold=0.35,
-                                   skip_profiles=False):
+                                   skip_profiles=False, min_interactions=0):
     """
     Multi-caption bulk scraper:
     1. Search each caption → find accounts that use them
@@ -1137,14 +1144,20 @@ def scrape_accounts_from_captions(captions_list, max_account_videos=30,
                     if not url:
                         url = f"https://www.tiktok.com/@{author}/video/{vid_id}" if author else ""
                     if url and url not in seen_urls:
+                        v_likes = info.get("likes", 0)
+                        v_shares = info.get("shares", 0)
+                        v_comments = info.get("comments", 0)
+                        total_int = v_likes + v_shares + v_comments
+                        if min_interactions and total_int > 0 and total_int < min_interactions:
+                            continue
                         seen_urls.add(url)
                         seen_video_ids.add(vid_id)
                         all_results.append({
                             "url": url,
                             "views": info.get("views", 0),
-                            "likes": info.get("likes", 0),
-                            "shares": info.get("shares", 0),
-                            "comments": info.get("comments", 0),
+                            "likes": v_likes,
+                            "shares": v_shares,
+                            "comments": v_comments,
                             "keyword": "caption_match",
                             "caption": caption_text[:100],
                             "author": author,
@@ -1320,6 +1333,12 @@ def scrape_accounts_from_captions(captions_list, max_account_videos=30,
                 if min_views and views > 0 and views < min_views:
                     continue
 
+                shares = api_info.get("shares", 0)
+                comments = api_info.get("comments", 0)
+                total_interactions = likes + comments + shares
+                if min_interactions and total_interactions > 0 and total_interactions < min_interactions:
+                    continue
+
                 seen_urls.add(full_url)
                 seen_video_ids.add(vid_id)
                 account_video_count += 1
@@ -1328,8 +1347,8 @@ def scrape_accounts_from_captions(captions_list, max_account_videos=30,
                     "url": full_url,
                     "views": views,
                     "likes": likes,
-                    "shares": api_info.get("shares", 0),
-                    "comments": api_info.get("comments", 0),
+                    "shares": shares,
+                    "comments": comments,
                     "keyword": f"@{username}",
                     "caption": api_info.get("caption", json_info.get("caption", ""))[:100],
                     "author": username,
@@ -1352,13 +1371,18 @@ def scrape_accounts_from_captions(captions_list, max_account_videos=30,
                 if min_views and views > 0 and views < min_views:
                     continue
 
+                likes_api = api_info.get("likes", 0)
+                total_interactions = likes_api
+                if min_interactions and total_interactions > 0 and total_interactions < min_interactions:
+                    continue
+
                 seen_urls.add(url)
                 seen_video_ids.add(vid_id)
                 account_video_count += 1
                 all_results.append({
                     "url": url,
                     "views": views,
-                    "likes": api_info.get("likes", 0),
+                    "likes": likes_api,
                     "shares": 0, "comments": 0,
                     "keyword": f"@{username}",
                     "caption": api_info.get("caption", "")[:100],

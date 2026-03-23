@@ -120,6 +120,7 @@ MAX_VIDEOS_PER_KEYWORD = 200            # Videos to collect per keyword
 MIN_VIEWS = 10_000                     # Lowered for AI content (newer = fewer views)
 MIN_LIKES = 0                          # Minimum like count (0 = no filter)
 MIN_ENGAGEMENT_RATIO = 0.02            # Min likes/views ratio (2% = cast widest net)
+MIN_INTERACTIONS = 10_000              # Minimum total interactions (likes + comments + shares)
 SCROLL_COUNT = 40                      # More scrolling = more videos found
 HEADLESS = True                        # Run browser without GUI
 
