@@ -957,7 +957,8 @@ def scrape_tiktok_by_caption(viral_caption, max_videos=50, scroll_count=10,
 
 def scrape_accounts_from_captions(captions_list, max_account_videos=30,
                                    scroll_count=15, headless=True,
-                                   min_views=0, match_threshold=0.35):
+                                   min_views=0, match_threshold=0.35,
+                                   skip_profiles=False):
     """
     Multi-caption bulk scraper:
     1. Search each caption → find accounts that use them
@@ -1153,8 +1154,10 @@ def scrape_accounts_from_captions(captions_list, max_account_videos=30,
         print(f"   ✅  Found {len(discovered_authors)} unique accounts from caption matches")
         print(f"   ✅  {len(all_results)} videos from caption search directly")
 
-        if not discovered_authors:
+        if not discovered_authors or skip_profiles:
             context.close()
+            if skip_profiles and discovered_authors:
+                print(f"   ⏭  Skipping Phase 2 (--skip-profiles). Keeping {len(all_results)} caption-matched videos.")
             return all_results
 
         # ── Phase 2: Scrape each discovered account's profile ──────

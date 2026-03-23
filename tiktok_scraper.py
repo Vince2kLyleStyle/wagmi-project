@@ -191,6 +191,10 @@ def main():
         help="Bulk mode: search multiple captions → find accounts → scrape their profiles"
     )
     parser.add_argument(
+        "--skip-profiles", action="store_true",
+        help="In bulk mode, skip Phase 2 (account scraping) and just keep caption-matched videos"
+    )
+    parser.add_argument(
         "--pull-chat", type=str, default=None,
         help='Pull videos from a Telegram chat (e.g. --pull-chat "Friend Name")'
     )
@@ -332,6 +336,7 @@ def main():
             headless=not args.no_headless,
             min_views=args.min_views,
             match_threshold=cfg.CAPTION_MATCH_THRESHOLD,
+            skip_profiles=args.skip_profiles,
         )
 
         new_results = [r for r in results if r["url"] not in existing]

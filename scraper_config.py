@@ -76,13 +76,6 @@ CAPTION_MATCH_THRESHOLD = 0.35
 # Phase 2: Scrape each account's full profile → get ALL their videos
 # Add more captions here to discover more accounts and get more content.
 VIRAL_CAPTIONS = [
-    # Japan piezoelectric tiles
-    "Japan is turning footsteps into electricity "
-    "Using piezoelectric tiles every step you take generates a small amount of energy",
-
-    # Titanic Korean caption
-    "1997년 개봉한 영화 Titanic은 잭과 로즈의 운명적인 사랑을 통해 비극 속에서도 오래 남는 감정의 깊이를 보여주는 작품입니다",
-
     # AI fruit / food viral captions
     "This fruit doesn't exist it was made by AI",
     "AI generated food that looks more real than real food",
