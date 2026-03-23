@@ -58,6 +58,24 @@ NICHES = {
         "ai kinetic sand food", "ai candy factory",
         "ai chocolate factory", "ai fruit factory",
     ],
+    "facts_brainrot": [
+        # AI narrated facts / did you know style
+        "ai facts", "ai did you know", "ai narrated facts",
+        "ai voice facts", "ai fun facts", "ai history facts",
+        "ai science facts", "ai country facts", "ai japan facts",
+        "ai world facts", "ai mind blowing facts",
+        # Specific viral formats
+        "japan turning footsteps into electricity",
+        "piezoelectric tiles", "ai technology facts",
+        "ai inventions", "ai future technology",
+        "countries doing insane things", "japan innovation",
+        "things you didn't know existed",
+        "ai generated documentary", "ai narrated",
+        # Korean/multilingual AI caption style
+        "ai voiceover facts", "robot voice facts",
+        "text to speech facts", "tts brainrot facts",
+        "ai slideshow facts", "ai facts compilation",
+    ],
 }
 
 # ─── Viral Caption Search ────────────────────────────────────────────
@@ -76,6 +94,13 @@ CAPTION_MATCH_THRESHOLD = 0.35
 # Phase 2: Scrape each account's full profile → get ALL their videos
 # Add more captions here to discover more accounts and get more content.
 VIRAL_CAPTIONS = [
+    # Japan piezoelectric tiles
+    "Japan is turning footsteps into electricity "
+    "Using piezoelectric tiles every step you take generates a small amount of energy",
+
+    # Titanic Korean caption
+    "1997년 개봉한 영화 Titanic은 잭과 로즈의 운명적인 사랑을 통해 비극 속에서도 오래 남는 감정의 깊이를 보여주는 작품입니다",
+
     # AI fruit / food viral captions
     "This fruit doesn't exist it was made by AI",
     "AI generated food that looks more real than real food",
