@@ -17,7 +17,7 @@ import sys
 from datetime import datetime
 
 import scraper_config as cfg
-from tiktok_discover import scrape_tiktok, login_to_tiktok, scrape_tiktok_by_caption, scrape_accounts_from_captions, scrape_account
+from tiktok_discover import scrape_tiktok, login_to_tiktok, scrape_tiktok_by_caption, scrape_accounts_from_captions, scrape_account, set_active_niche
 from telegram_sender import send_urls_sync, send_and_download_sync, telegram_login_sync
 from telegram_pull import pull_videos_sync
 
@@ -56,6 +56,7 @@ def save_urls(results, filepath):
 
 def run_niche(niche_name, keywords, args, existing_urls):
     """Scrape + download for a single niche. Returns count of new videos."""
+    set_active_niche(niche_name)
     download_dir = os.path.join(cfg.DOWNLOAD_DIR, niche_name)
 
     print(f"\n{'═' * 54}")
@@ -242,6 +243,7 @@ def main():
     # ─── Account scrape mode ──────────────────────────────────────
     if args.account:
         niche_name = args.niche[0] if args.niche else "memes"
+        set_active_niche(niche_name)
         download_dir = os.path.join(cfg.DOWNLOAD_DIR, niche_name)
 
         print(f"  Mode:         ACCOUNT SCRAPE")
@@ -324,6 +326,7 @@ def main():
             sys.exit(1)
 
         niche_name = args.niche[0] if args.niche else "memes"
+        set_active_niche(niche_name)
         download_dir = os.path.join(cfg.DOWNLOAD_DIR, niche_name)
 
         print(f"  Mode:         BULK (caption → account → profile scrape)")
@@ -386,6 +389,7 @@ def main():
             sys.exit(1)
 
         niche_name = args.niche[0] if args.niche else "memes"
+        set_active_niche(niche_name)
         download_dir = os.path.join(cfg.DOWNLOAD_DIR, niche_name)
 
         print(f"  Mode:         CAPTION SEARCH")

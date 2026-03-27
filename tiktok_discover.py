@@ -26,6 +26,43 @@ STEALTH_ARGS = [
 ]
 
 
+def _is_on_niche(caption: str, niche: str = "") -> bool:
+    """
+    Check if a video caption is on-niche (relevant content we want).
+    Returns False if caption hits the blocklist or misses required terms.
+    """
+    import scraper_config as cfg
+
+    if not caption or len(caption.strip()) < 3:
+        return True  # No caption to judge — let it through
+
+    cap_lower = caption.lower()
+
+    # Check blocklist — any match = reject
+    for term in cfg.CAPTION_BLOCKLIST:
+        if term.lower() in cap_lower:
+            return False
+
+    # Check niche-specific required terms (if configured)
+    required = cfg.NICHE_REQUIRED_TERMS.get(niche, [])
+    if required:
+        # At least ONE required term must appear
+        if not any(term.lower() in cap_lower for term in required):
+            return False
+
+    return True
+
+
+# Active niche — set by the scraper entry point so filters know which niche we're scraping
+_active_niche = ""
+
+
+def set_active_niche(niche: str):
+    """Set the active niche for relevance filtering."""
+    global _active_niche
+    _active_niche = niche
+
+
 def parse_count(text: str) -> int:
     """Parse abbreviated counts like '1.5M', '200K', '10B' into integers."""
     text = text.strip().upper().replace(",", "")
@@ -407,6 +444,7 @@ def _extract_videos(page, keyword, min_views, min_likes, min_engagement_ratio=0.
 
     # Build results
     skipped_engagement = 0
+    skipped_niche = 0
     for video_id in seen_ids:
         stats = video_stats.get(video_id, {"views": 0, "likes": 0, "shares": 0, "comments": 0})
         views = stats["views"]
@@ -942,6 +980,10 @@ def scrape_tiktok_by_caption(viral_caption, max_videos=50, scroll_count=10,
         if min_views and views > 0 and views < min_views:
             continue
 
+        # Niche relevance filter
+        if not _is_on_niche(caption, _active_niche):
+            continue
+
         seen_urls.add(url)
         seen_video_ids.add(vid_id)
         total_matched += 1
@@ -1333,6 +1375,11 @@ def scrape_accounts_from_captions(captions_list, max_account_videos=30,
                 if min_views and views > 0 and views < min_views:
                     continue
 
+                # Niche relevance filter — reject off-topic content
+                vid_caption = api_info.get("caption") or json_info.get("caption", "") or ""
+                if vid_caption and not _is_on_niche(vid_caption, _active_niche):
+                    continue
+
                 shares = api_info.get("shares", 0)
                 comments = api_info.get("comments", 0)
                 total_interactions = likes + comments + shares
@@ -1350,7 +1397,7 @@ def scrape_accounts_from_captions(captions_list, max_account_videos=30,
                     "shares": shares,
                     "comments": comments,
                     "keyword": f"@{username}",
-                    "caption": api_info.get("caption", json_info.get("caption", ""))[:100],
+                    "caption": vid_caption[:100],
                     "author": username,
                 })
 
@@ -1371,6 +1418,11 @@ def scrape_accounts_from_captions(captions_list, max_account_videos=30,
                 if min_views and views > 0 and views < min_views:
                     continue
 
+                # Niche relevance filter
+                api_caption = api_info.get("caption", "")
+                if api_caption and not _is_on_niche(api_caption, _active_niche):
+                    continue
+
                 likes_api = api_info.get("likes", 0)
                 total_interactions = likes_api
                 if min_interactions and total_interactions > 0 and total_interactions < min_interactions:
@@ -1385,7 +1437,7 @@ def scrape_accounts_from_captions(captions_list, max_account_videos=30,
                     "likes": likes_api,
                     "shares": 0, "comments": 0,
                     "keyword": f"@{username}",
-                    "caption": api_info.get("caption", "")[:100],
+                    "caption": api_caption[:100],
                     "author": username,
                 })
                 if account_video_count >= max_account_videos:
@@ -1628,6 +1680,10 @@ def scrape_account(username, max_videos=100, scroll_count=25, headless=True,
         if min_views and views > 0 and views < min_views:
             continue
 
+        # Niche relevance filter
+        if caption and not _is_on_niche(caption, _active_niche):
+            continue
+
         seen_video_ids.add(vid_id)
         all_results.append({
             "url": full_url,
@@ -1650,8 +1706,11 @@ def scrape_account(username, max_videos=100, scroll_count=25, headless=True,
         views = api_info.get("views", 0)
         if min_views and views > 0 and views < min_views:
             continue
-        seen_video_ids.add(vid_id)
         caption = api_info.get("caption", "")
+        # Niche relevance filter
+        if caption and not _is_on_niche(caption, _active_niche):
+            continue
+        seen_video_ids.add(vid_id)
         all_results.append({
             "url": url,
             "views": views,

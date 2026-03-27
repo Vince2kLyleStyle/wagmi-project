@@ -114,6 +114,53 @@ VIRAL_CAPTIONS = [
     "The most satisfying AI food video you'll ever see",
 ]
 
+# ─── Niche Relevance Filter ──────────────────────────────────────────
+# Block videos whose captions contain these terms (case-insensitive).
+# This stops thirst traps, OF promos, and other off-niche garbage from
+# being downloaded even when scraped from an otherwise-good account.
+CAPTION_BLOCKLIST = [
+    # Thirst trap / suggestive
+    "thirst trap", "thirsttrap", "baddie", "baddies",
+    "hot girl", "hotgirl", "body check", "bodycheck",
+    "bikini", "lingerie", "onlyfans", "of link", "link in bio",
+    "dm me", "dm for", "come find me", "spicy content",
+    "18+", "nsfw", "uncensored", "explicit",
+    "grwm date", "date night outfit", "fit check sexy",
+    "thot", "thotiana", "freaky", "no bra",
+    # Adult / OF promo
+    "fansly", "fanvue", "manyvids", "cam girl", "camgirl",
+    "sugar daddy", "sugar baby", "findom",
+    # Romance / relationship bait
+    "pov he", "pov she", "pov your crush", "pov boyfriend",
+    "couple goals", "relationship goals",
+    "kiss cam", "makeout", "making out",
+    # Dance / model content (not memes)
+    "dance challenge", "dance trend", "model walk",
+    "runway walk", "slow mo walk",
+    # Gambling / trading (if scraping memes niche)
+    # Uncomment these if you only want meme content:
+    # "forex", "crypto signal", "trading signal",
+]
+
+# Require at least ONE of these terms in the caption for niche relevance.
+# Leave empty to skip positive matching (only blocklist filtering).
+# These are checked per-niche — set in NICHE_REQUIRED_TERMS below.
+NICHE_REQUIRED_TERMS = {
+    "memes": [],  # memes are broad — just rely on blocklist
+    "ai_brainrot": [
+        "ai", "artificial", "generated", "neural",
+        "fruit", "food", "satisfying", "asmr",
+        "cake", "candy", "chocolate", "jelly",
+        "brainrot", "brain rot",
+    ],
+    "facts_brainrot": [
+        "fact", "facts", "did you know", "mind blow",
+        "country", "japan", "piezoelectric", "invention",
+        "science", "history", "technology", "ai",
+        "brainrot", "brain rot", "narrated",
+    ],
+}
+
 # Max videos to grab per discovered account
 MAX_VIDEOS_PER_ACCOUNT = 30
 MAX_VIDEOS_PER_KEYWORD = 200            # Videos to collect per keyword
