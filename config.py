@@ -29,17 +29,27 @@ DAILY_MAX = 144        # ~3 per 30 min over 24h
 BATCH_SIZE = 3         # videos per mini-batch (2-3 posts per batch)
 
 # ─── Caption ──────────────────────────────────────────────────────
-# Captions — randomly picked for each upload
+# Proven algorithm captions — these are what grab the IG algorithm.
+# The Japan/Titanic ones are tested and work. Motion ones add brand.
+# You'll paste the new one from the reel when you have it.
 VIRAL_CAPTIONS = [
+    # ── Proven algorithm catchers (DO NOT REMOVE) ──
+    (
+        "#🇯🇵Japan is turning footsteps into electricity! "
+        "Using piezoelectric tiles, every step you take generates a small amount of energy. "
+        "Millions of steps together can power LED lights and displays in busy places like "
+        "Shibuya Station. A brilliant way to create a sustainable and smart city • turning m"
+    ),
+    (
+        "1997년 개봉한 영화 Titanic은 잭과 로즈의 운명적인 사랑을 통해 "
+        "비극 속에서도 오래 남는 감정의 깊이를 보여주는 작품입니다"
+    ),
+    # ── Motion brand captions ──
     "this is what motion looks like 🔥 #motion #sigma #grindset",
     "motion never stops 💰 #motion #money #hustle",
     "built different. #motion #mindset #success",
     "the grind is silent, the results are loud 🐺 #motion #wolfofwallstreet",
     "money talks, motion walks 💸 #motion #lifestyle",
-    "no days off. #motion #grind #entrepreneur",
-    "motion is a lifestyle, not a moment 🏆 #motion #winning",
-    "they sleep, we grind 🌙 #motion #hustle #sigma",
-    "this edit goes crazy 🔥 #motion #edit #viral",
     "cold. calculated. motion. ❄️ #motion #sigma #mindset",
 ]
 USE_SAME_CAPTION = True

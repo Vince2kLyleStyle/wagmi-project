@@ -255,9 +255,15 @@ CAPTION_BLOCKLIST = [
     # Dance / model content (not memes)
     "dance challenge", "dance trend", "model walk",
     "runway walk", "slow mo walk",
-    # Gambling / trading (if scraping memes niche)
-    # Uncomment these if you only want meme content:
-    # "forex", "crypto signal", "trading signal",
+    # Low quality / off-brand for motion
+    "unboxing", "haul", "what i eat in a day",
+    "get ready with me", "grwm", "skincare routine",
+    "makeup tutorial", "cooking recipe", "food review",
+    "asmr eating", "mukbang",
+    "anime edit", "kpop edit", "kpop fancam",
+    "fan edit", "fanfic", "wattpad",
+    "sad edit", "crying edit", "depression",
+    "self harm", "mental health vent",
 ]
 
 # Require at least ONE of these terms in the caption for niche relevance.
@@ -299,10 +305,10 @@ NICHE_REQUIRED_TERMS = {
 # Max videos to grab per discovered account
 MAX_VIDEOS_PER_ACCOUNT = 30
 MAX_VIDEOS_PER_KEYWORD = 200            # Videos to collect per keyword
-MIN_VIEWS = 10_000                     # Lowered for AI content (newer = fewer views)
-MIN_LIKES = 0                          # Minimum like count (0 = no filter)
-MIN_ENGAGEMENT_RATIO = 0.02            # Min likes/views ratio (2% = cast widest net)
-MIN_INTERACTIONS = 10_000              # Minimum total interactions (likes + comments + shares)
+MIN_VIEWS = 50_000                     # Higher bar — motion niche has tons of viral content
+MIN_LIKES = 1_000                      # Minimum like count — filters out dead content
+MIN_ENGAGEMENT_RATIO = 0.03            # Min likes/views ratio (3% = quality content only)
+MIN_INTERACTIONS = 25_000              # Minimum total interactions (likes + comments + shares)
 SCROLL_COUNT = 40                      # More scrolling = more videos found
 HEADLESS = True                        # Run browser without GUI
 
