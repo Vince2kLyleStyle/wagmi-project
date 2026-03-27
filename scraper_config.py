@@ -9,10 +9,10 @@ load_dotenv()
 
 # ─── TikTok Search ────────────────────────────────────────────────────
 KEYWORDS = [                           # Default keywords (used when no niche specified)
-    "shitpost", "brainrot", "low quality meme",
-    "deep fried meme", "cursed video", "unhinged meme",
-    "perfectly cut screams", "meme that goes hard",
-    "earrape meme", "dank meme compilation",
+    "funny tiktok", "funny reels", "trending meme",
+    "meme compilation", "try not to laugh",
+    "perfectly cut screams", "funny skit",
+    "shitpost", "brainrot", "dank meme",
 ]
 
 # ─── Niche Presets ────────────────────────────────────────────────────
@@ -21,11 +21,27 @@ KEYWORDS = [                           # Default keywords (used when no niche sp
 # Add new niches here — the pipeline and scraper will auto-detect them.
 NICHES = {
     "memes": [
-        "shitpost", "brainrot",
+        # Core funny / trending
+        "funny tiktok", "funny reels", "funny meme",
+        "trending meme", "viral meme", "meme compilation",
+        "funny video compilation", "try not to laugh",
+        "meme that goes hard", "funniest tiktoks",
+        # Specific viral formats
+        "perfectly cut screams", "unexpected ending",
+        "wait for it funny", "caught in 4k",
+        "bro what", "nah this is crazy",
+        "real life npc", "skit comedy",
+        "funny skit", "comedy tiktok",
+        # Brainrot / shitpost (still gold)
+        "shitpost", "brainrot", "unhinged meme",
+        "cursed video", "dank meme",
         "low quality meme", "deep fried meme",
-        "cursed video", "unhinged meme",
-        "perfectly cut screams", "meme that goes hard",
-        "earrape meme", "dank meme compilation",
+        # Relatable / trending humor
+        "relatable meme", "gen z humor",
+        "when you realize", "pov funny",
+        "bro really said", "this guy is a legend",
+        "hood memes", "funny fails",
+        "instant regret", "karma funny",
     ],
     "ai_brainrot": [
         # Core AI food / fruit terms
@@ -146,7 +162,7 @@ CAPTION_BLOCKLIST = [
 # Leave empty to skip positive matching (only blocklist filtering).
 # These are checked per-niche — set in NICHE_REQUIRED_TERMS below.
 NICHE_REQUIRED_TERMS = {
-    "memes": [],  # memes are broad — just rely on blocklist
+    "memes": [],  # memes are broad — blocklist is enough (funny content comes in many forms)
     "ai_brainrot": [
         "ai", "artificial", "generated", "neural",
         "fruit", "food", "satisfying", "asmr",
