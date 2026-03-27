@@ -100,9 +100,10 @@ def create_client(session_file=None):
 # ─── Core Logic ───────────────────────────────────────────────────────
 
 def get_my_reels(cl, amount=100):
-    """Fetch your recent reels/clips."""
-    user_id = cl.user_id_from_username(config.USERNAME)
-    medias = cl.user_medias(user_id, amount=amount)
+    """Fetch your recent reels/clips using the private API (avoids 429s)."""
+    user_id = cl.user_id  # already set after login — no extra request needed
+    # user_medias_v1 uses the private API instead of public GraphQL
+    medias = cl.user_medias_v1(user_id, amount=amount)
     # Filter to only clips/reels (media_type 2 = video, product_type = clips)
     reels = [
         m for m in medias
