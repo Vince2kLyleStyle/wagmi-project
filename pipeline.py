@@ -73,6 +73,20 @@ def run_scraper(niches, no_headless=False, no_telegram=False):
     return result.returncode == 0
 
 
+def run_nsfw_filter(niches, dry_run=False):
+    """Run NSFW filter on all niche video folders."""
+    print(f"\n{'═' * 60}")
+    print(f"  STEP 1.5: NSFW Content Filter")
+    print(f"{'═' * 60}")
+
+    cmd = [sys.executable, "nsfw_filter.py", "--all-niches"]
+    if dry_run:
+        cmd.append("--dry-run")
+
+    result = subprocess.run(cmd, cwd=os.path.dirname(__file__) or ".")
+    return result.returncode == 0
+
+
 def run_poster(accounts_by_niche, niches):
     """Run fader_reels.py for each niche that has an IG account and videos."""
     print(f"\n{'═' * 60}")
@@ -140,6 +154,10 @@ def main():
                        help="Show browser window during scraping")
     parser.add_argument("--no-telegram", action="store_true",
                        help="Skip Telegram (scrape URLs only, no download)")
+    parser.add_argument("--skip-nsfw-filter", action="store_true",
+                       help="Skip NSFW content filter")
+    parser.add_argument("--nsfw-dry-run", action="store_true",
+                       help="Preview NSFW filter results without quarantining")
 
     args = parser.parse_args()
 
@@ -175,6 +193,10 @@ def main():
     if not args.post_only:
         run_scraper(niches, no_headless=args.no_headless,
                    no_telegram=args.no_telegram)
+
+    # Step 1.5: NSFW Filter
+    if not args.post_only and not getattr(args, 'skip_nsfw_filter', False):
+        run_nsfw_filter(niches, dry_run=getattr(args, 'nsfw_dry_run', False))
 
     # Step 2: Post
     if not args.scrape_only:
