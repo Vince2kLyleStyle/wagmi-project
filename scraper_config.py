@@ -164,82 +164,59 @@ NICHES = {
 }
 
 # ─── Viral Caption Search ────────────────────────────────────────────
-# Search TikTok for videos using this exact viral caption.
-# Videos with the same caption are pre-filtered quality content.
-VIRAL_CAPTION_SEARCH = (
-    "bro really thought he could get away with this"
-)
-# How much of the caption must match to count (0.0-1.0)
+VIRAL_CAPTION_SEARCH = "this edit goes hard"
 CAPTION_MATCH_THRESHOLD = 0.35
 
 # ─── Bulk Mode: Multiple Viral Captions ──────────────────────────────
-# Accounts that use these captions post the type of content we want.
-# Phase 1: Search captions → discover accounts
-# Phase 2: Scrape each account's full profile → get ALL their videos
-# Add more captions here to discover more accounts and get more content.
+# Search these captions to find motion/grindset accounts and videos.
 VIRAL_CAPTIONS = [
-    # ── These were already working well ──
-    # Japan piezoelectric tiles
-    "Japan is turning footsteps into electricity "
-    "Using piezoelectric tiles every step you take generates a small amount of energy",
-
-    # Titanic Korean caption
-    "1997년 개봉한 영화 Titanic은 잭과 로즈의 운명적인 사랑을 통해 비극 속에서도 오래 남는 감정의 깊이를 보여주는 작품입니다",
-
-    # ── Funny / trending meme viral captions ──
-    # Classic repost captions used by meme pages
-    "bro really thought he could get away with this",
-    "nah this is actually insane",
-    "this might be the funniest video on the internet",
-    "i cant stop watching this",
-    "who made this im crying",
-    "bro was not expecting that",
-    "the way i screamed",
-    "this is the content i signed up for",
-    "tell me why this is so accurate",
-    "no way this is real",
-
-    # Perfectly cut / unexpected
-    "wait for it",
-    "the ending got me",
-    "I was not ready for that ending",
-    "the last part sent me",
-
-    # Relatable / gen z humor
-    "why is this so relatable",
-    "this is literally me",
-    "POV you finally found the funny side of tiktok",
-    "the humor is immaculate",
-
-    # Engagement bait that meme pages use
-    "follow for more funny content",
-    "tag someone who needs to see this",
-    "send this to someone without context",
-    "save this before it gets deleted",
-
-    # Minecraft parkour / storytime
-    "storytime while you watch minecraft parkour",
-    "part 1 storytime minecraft parkour",
-    "this story is insane minecraft parkour",
-    "reddit stories with minecraft parkour",
-    "storytime that will keep you up at night",
-
-    # ── Motion / money / sigma edits ──
+    # ── Movie edit captions ──
     "this edit goes hard",
     "wolf of wall street never gets old",
     "jordan belfort was different",
-    "money is the motive",
-    "the grind never stops",
-    "sigma rule number one",
-    "he was built different",
-    "this is what motion looks like",
     "scarface understood the game",
     "thomas shelby was not a man to be messed with",
+    "patrick bateman was ahead of his time",
+    "walter white transformation edit",
+    "peaky blinders hits different",
+    "the godfather is a masterpiece",
+    "goodfellas never misses",
+
+    # ── Sigma / grindset ──
+    "sigma rule number one",
+    "he was built different",
+    "the grind never stops",
+    "sigma male grindset",
+    "lone wolf mentality",
+    "not everyone will understand your grind",
+    "they laughed at me now they watch",
+    "silence is the best reply",
+    "work in silence let success make the noise",
+    "discipline is the bridge between goals and accomplishment",
+
+    # ── Money / success ──
+    "money is the motive",
+    "billionaire mindset hits different",
     "the only way is up",
+    "money talks everything else walks",
+    "get money or die trying",
+    "rich mindset vs poor mindset",
+    "this is what success looks like",
+    "making money while they sleep",
+    "the bag doesn't stop",
+    "secure the bag",
+
+    # ── Edit format captions ──
     "cold edit that goes crazy",
     "phonk edit money motivation",
-    "billionaire mindset hits different",
-    "trading wins compilation",
+    "this edit is insane",
+    "hardest edit on tiktok",
+    "after effects edit goes hard",
+    "4k edit that hits different",
+    "cinematic edit motivation",
+    "phonk edits hit different at night",
+    "villain arc activated",
+    "dark knight energy",
 ]
 
 # ─── Niche Relevance Filter ──────────────────────────────────────────
