@@ -40,17 +40,7 @@ VIRAL_CAPTIONS = [
         "Millions of steps together can power LED lights and displays in busy places like "
         "Shibuya Station. A brilliant way to create a sustainable and smart city • turning m"
     ),
-    (
-        "1997년 개봉한 영화 Titanic은 잭과 로즈의 운명적인 사랑을 통해 "
-        "비극 속에서도 오래 남는 감정의 깊이를 보여주는 작품입니다"
-    ),
-    # ── Motion brand captions ──
-    "this is what motion looks like 🔥 #motion #sigma #grindset",
-    "motion never stops 💰 #motion #money #hustle",
-    "built different. #motion #mindset #success",
-    "the grind is silent, the results are loud 🐺 #motion #wolfofwallstreet",
-    "money talks, motion walks 💸 #motion #lifestyle",
-    "cold. calculated. motion. ❄️ #motion #sigma #mindset",
+    # Add more proven captions here as you find them
 ]
 USE_SAME_CAPTION = True
 
