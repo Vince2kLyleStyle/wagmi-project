@@ -74,6 +74,23 @@ NICHES = {
         "ai kinetic sand food", "ai candy factory",
         "ai chocolate factory", "ai fruit factory",
     ],
+    "minecraft_parkour": [
+        # Core format
+        "minecraft parkour", "minecraft parkour storytime",
+        "parkour storytime", "minecraft story time",
+        "minecraft parkour story", "storytime minecraft",
+        "minecraft storytelling", "storytime parkour",
+        # Variations
+        "minecraft parkour asmr", "minecraft parkour satisfying",
+        "minecraft storytime tiktok", "reddit stories minecraft",
+        "reddit storytime minecraft", "scary story minecraft parkour",
+        "confession minecraft parkour", "aita minecraft parkour",
+        "minecraft background storytime", "subway surfers storytime",
+        "subway surfers parkour", "satisfying gameplay storytime",
+        # Related gameplay background formats
+        "storytime gameplay", "reddit story gameplay",
+        "tiktok storytime gameplay", "viral storytime minecraft",
+    ],
     "facts_brainrot": [
         # AI narrated facts / did you know style
         "ai facts", "ai did you know", "ai narrated facts",
@@ -147,6 +164,13 @@ VIRAL_CAPTIONS = [
     "tag someone who needs to see this",
     "send this to someone without context",
     "save this before it gets deleted",
+
+    # Minecraft parkour / storytime
+    "storytime while you watch minecraft parkour",
+    "part 1 storytime minecraft parkour",
+    "this story is insane minecraft parkour",
+    "reddit stories with minecraft parkour",
+    "storytime that will keep you up at night",
 ]
 
 # ─── Niche Relevance Filter ──────────────────────────────────────────
@@ -187,6 +211,11 @@ NICHE_REQUIRED_TERMS = {
         "fruit", "food", "satisfying", "asmr",
         "cake", "candy", "chocolate", "jelly",
         "brainrot", "brain rot",
+    ],
+    "minecraft_parkour": [
+        "minecraft", "parkour", "storytime", "story time",
+        "subway surfers", "gameplay", "reddit",
+        "confession", "aita", "scary story",
     ],
     "facts_brainrot": [
         "fact", "facts", "did you know", "mind blow",
