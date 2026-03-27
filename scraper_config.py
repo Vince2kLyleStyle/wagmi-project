@@ -98,8 +98,7 @@ NICHES = {
 # Search TikTok for videos using this exact viral caption.
 # Videos with the same caption are pre-filtered quality content.
 VIRAL_CAPTION_SEARCH = (
-    "Japan is turning footsteps into electricity "
-    "Using piezoelectric tiles every step you take generates a small amount of energy"
+    "bro really thought he could get away with this"
 )
 # How much of the caption must match to count (0.0-1.0)
 CAPTION_MATCH_THRESHOLD = 0.35
@@ -110,6 +109,7 @@ CAPTION_MATCH_THRESHOLD = 0.35
 # Phase 2: Scrape each account's full profile → get ALL their videos
 # Add more captions here to discover more accounts and get more content.
 VIRAL_CAPTIONS = [
+    # ── These were already working well ──
     # Japan piezoelectric tiles
     "Japan is turning footsteps into electricity "
     "Using piezoelectric tiles every step you take generates a small amount of energy",
@@ -117,17 +117,36 @@ VIRAL_CAPTIONS = [
     # Titanic Korean caption
     "1997년 개봉한 영화 Titanic은 잭과 로즈의 운명적인 사랑을 통해 비극 속에서도 오래 남는 감정의 깊이를 보여주는 작품입니다",
 
-    # AI fruit / food viral captions
-    "This fruit doesn't exist it was made by AI",
-    "AI generated food that looks more real than real food",
-    "POV AI makes your favorite fruit",
-    "AI fruit is taking over tiktok",
-    "Would you eat this AI generated food",
-    "This AI fruit is so satisfying to watch",
-    "AI made this and it looks delicious",
-    "Can you tell this food was made by AI",
-    "AI is getting too good at making food",
-    "The most satisfying AI food video you'll ever see",
+    # ── Funny / trending meme viral captions ──
+    # Classic repost captions used by meme pages
+    "bro really thought he could get away with this",
+    "nah this is actually insane",
+    "this might be the funniest video on the internet",
+    "i cant stop watching this",
+    "who made this im crying",
+    "bro was not expecting that",
+    "the way i screamed",
+    "this is the content i signed up for",
+    "tell me why this is so accurate",
+    "no way this is real",
+
+    # Perfectly cut / unexpected
+    "wait for it",
+    "the ending got me",
+    "I was not ready for that ending",
+    "the last part sent me",
+
+    # Relatable / gen z humor
+    "why is this so relatable",
+    "this is literally me",
+    "POV you finally found the funny side of tiktok",
+    "the humor is immaculate",
+
+    # Engagement bait that meme pages use
+    "follow for more funny content",
+    "tag someone who needs to see this",
+    "send this to someone without context",
+    "save this before it gets deleted",
 ]
 
 # ─── Niche Relevance Filter ──────────────────────────────────────────
