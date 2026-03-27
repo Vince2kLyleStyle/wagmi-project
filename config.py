@@ -21,7 +21,7 @@ SESSION_FILE = os.path.join(SESSION_DIR, f"{USERNAME}_session.json")
 PROXY = os.getenv("IG_PROXY", "")
 
 # ─── Video Source ───────────────────────────────────────────────────
-VIDEO_DIR = os.path.join(os.path.dirname(__file__), "tiktok_videos", os.getenv("NICHE", "ai_brainrot"))
+VIDEO_DIR = os.path.join(os.path.dirname(__file__), "tiktok_videos", os.getenv("NICHE", "memes"))
 
 # ─── Posting Limits ────────────────────────────────────────────────
 DAILY_MIN = 96         # ~2-3 per 30 min over 24h
