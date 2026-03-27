@@ -21,7 +21,7 @@ SESSION_FILE = os.path.join(SESSION_DIR, f"{USERNAME}_session.json")
 PROXY = os.getenv("IG_PROXY", "")
 
 # ─── Video Source ───────────────────────────────────────────────────
-VIDEO_DIR = os.path.join(os.path.dirname(__file__), "tiktok_videos", os.getenv("NICHE", "memes"))
+VIDEO_DIR = os.path.join(os.path.dirname(__file__), "tiktok_videos", os.getenv("NICHE", "motion"))
 
 # ─── Posting Limits ────────────────────────────────────────────────
 DAILY_MIN = 96         # ~2-3 per 30 min over 24h
@@ -29,16 +29,41 @@ DAILY_MAX = 144        # ~3 per 30 min over 24h
 BATCH_SIZE = 3         # videos per mini-batch (2-3 posts per batch)
 
 # ─── Caption ──────────────────────────────────────────────────────
-# Exact caption — used for every upload
+# Captions — randomly picked for each upload
 VIRAL_CAPTIONS = [
-    (
-        "#🇯🇵Japan is turning footsteps into electricity! "
-        "Using piezoelectric tiles, every step you take generates a small amount of energy. "
-        "Millions of steps together can power LED lights and displays in busy places like "
-        "Shibuya Station. A brilliant way to create a sustainable and smart city • turning m"
-    ),
+    "this is what motion looks like 🔥 #motion #sigma #grindset",
+    "motion never stops 💰 #motion #money #hustle",
+    "built different. #motion #mindset #success",
+    "the grind is silent, the results are loud 🐺 #motion #wolfofwallstreet",
+    "money talks, motion walks 💸 #motion #lifestyle",
+    "no days off. #motion #grind #entrepreneur",
+    "motion is a lifestyle, not a moment 🏆 #motion #winning",
+    "they sleep, we grind 🌙 #motion #hustle #sigma",
+    "this edit goes crazy 🔥 #motion #edit #viral",
+    "cold. calculated. motion. ❄️ #motion #sigma #mindset",
 ]
 USE_SAME_CAPTION = True
+
+# ─── Watermark ───────────────────────────────────────────────────
+# Overlay text on each video before uploading
+WATERMARK_ENABLED = True
+WATERMARK_TEXT = "$MOTION"
+WATERMARK_FONTSIZE = 42
+WATERMARK_OPACITY = 0.85
+WATERMARK_POSITION = "bottom_right"   # top_left, top_right, bottom_left, bottom_right, center
+WATERMARK_COLOR = "white"
+WATERMARK_FONT = ""                   # leave empty for default, or path to .ttf file
+
+# ─── Pinned Comment ──────────────────────────────────────────────
+# Auto-comment and pin after each upload
+PIN_COMMENT_ENABLED = True
+PIN_COMMENTS = [
+    "Like and follow for motion 🔥💰",
+    "Follow for more motion 🐺",
+    "Motion never stops 💸 Follow for more",
+    "Like + Follow = Motion 🏆",
+    "This is motion. Follow for more 🔥",
+]
 
 # ─── Timing (seconds) ──────────────────────────────────────────────
 # Between videos in a batch

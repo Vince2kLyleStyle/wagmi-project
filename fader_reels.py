@@ -180,11 +180,105 @@ def relogin_client(cl: Client, session_file: str) -> Client:
     return cl
 
 
+# ─── Watermark Overlay ────────────────────────────────────────────
+
+def apply_watermark(video_path: str) -> str | None:
+    """
+    Burn a text watermark onto the video using ffmpeg.
+    Returns path to the watermarked temp file, or None on failure.
+    Original file is NOT modified.
+    """
+    if not config.WATERMARK_ENABLED:
+        return None
+
+    text = config.WATERMARK_TEXT
+    fontsize = config.WATERMARK_FONTSIZE
+    opacity = config.WATERMARK_OPACITY
+    color = config.WATERMARK_COLOR
+    position = config.WATERMARK_POSITION
+    font_file = config.WATERMARK_FONT
+
+    # Map position to ffmpeg drawtext x:y expressions
+    # Add padding from edges
+    pad = 20
+    pos_map = {
+        "top_left":     f"x={pad}:y={pad}",
+        "top_right":    f"x=w-tw-{pad}:y={pad}",
+        "bottom_left":  f"x={pad}:y=h-th-{pad}",
+        "bottom_right": f"x=w-tw-{pad}:y=h-th-{pad}",
+        "center":       f"x=(w-tw)/2:y=(h-th)/2",
+    }
+    xy = pos_map.get(position, pos_map["bottom_right"])
+
+    # Build drawtext filter
+    # Escape special characters for ffmpeg
+    escaped_text = text.replace("'", "'\\''").replace(":", "\\:")
+    font_arg = f":fontfile='{font_file}'" if font_file else ""
+    alpha = f":alpha={opacity}" if opacity < 1.0 else ""
+
+    drawtext = (
+        f"drawtext=text='{escaped_text}'"
+        f":fontsize={fontsize}"
+        f":fontcolor={color}{alpha}"
+        f":{xy}"
+        f"{font_arg}"
+        f":borderw=2:bordercolor=black@0.5"
+    )
+
+    # Output to temp file
+    out_path = os.path.join(
+        tempfile.gettempdir(),
+        f"fader_wm_{uuid.uuid4().hex[:8]}.mp4",
+    )
+
+    try:
+        result = subprocess.run(
+            [config.FFMPEG_PATH,
+             "-i", video_path,
+             "-vf", drawtext,
+             "-codec:a", "copy",
+             "-y", out_path],
+            capture_output=True, text=True, timeout=120,
+        )
+        if result.returncode != 0:
+            print(f"  [watermark] ffmpeg error: {result.stderr[:200]}")
+            return None
+
+        if os.path.exists(out_path) and os.path.getsize(out_path) > 0:
+            return out_path
+
+    except Exception as e:
+        print(f"  [watermark] Error (non-fatal): {e}")
+
+    return None
+
+
+# ─── Pinned Comment ───────────────────────────────────────────────
+
+def pin_comment_on_reel(cl: Client, media_id: str) -> bool:
+    """Post a comment and pin it on the uploaded reel."""
+    if not config.PIN_COMMENT_ENABLED:
+        return False
+
+    comment_text = random.choice(config.PIN_COMMENTS)
+    try:
+        comment = cl.media_comment(media_id, comment_text)
+        comment_pk = comment.pk
+        time.sleep(random.uniform(1, 3))
+        cl.comment_pin(media_id, comment_pk)
+        print(f"  [pin] Pinned: \"{comment_text}\"")
+        return True
+    except Exception as e:
+        print(f"  [pin] Comment/pin error (non-fatal): {e}")
+        return False
+
+
 # ─── Upload Logic ──────────────────────────────────────────────────
 
 def upload_reel(cl: Client, video_path: str) -> str | None:
     """
     Upload a single Reel. Returns the media ID on success, None on failure.
+    Applies watermark if enabled, pins comment after upload.
     """
     # Pick from the 3 preset captions, or use the random generator
     if config.USE_SAME_CAPTION:
@@ -193,8 +287,12 @@ def upload_reel(cl: Client, video_path: str) -> str | None:
         caption = captions.generate_caption()
     thumbnail = extract_random_thumbnail(video_path)
 
+    # Apply watermark overlay
+    watermarked = apply_watermark(video_path)
+    upload_path = watermarked or video_path
+
     kwargs = {
-        "path":    video_path,
+        "path":    upload_path,
         "caption": caption,
     }
     if thumbnail:
@@ -203,10 +301,17 @@ def upload_reel(cl: Client, video_path: str) -> str | None:
     try:
         media = cl.clip_upload(**kwargs)
         media_id = media.pk if hasattr(media, "pk") else str(media)
+        media_full_id = media.id if hasattr(media, "id") else str(media_id)
 
-        # Clean up temp thumbnail
+        # Clean up temp files
         if thumbnail and os.path.exists(thumbnail):
             os.remove(thumbnail)
+        if watermarked and os.path.exists(watermarked):
+            os.remove(watermarked)
+
+        # Pin comment on the new reel
+        time.sleep(random.uniform(2, 5))
+        pin_comment_on_reel(cl, media_full_id)
 
         return str(media_id)
 
@@ -230,6 +335,11 @@ def upload_reel(cl: Client, video_path: str) -> str | None:
         if thumbnail and os.path.exists(thumbnail):
             try:
                 os.remove(thumbnail)
+            except OSError:
+                pass
+        if watermarked and os.path.exists(watermarked):
+            try:
+                os.remove(watermarked)
             except OSError:
                 pass
 

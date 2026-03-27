@@ -109,6 +109,48 @@ NICHES = {
         "text to speech facts", "tts brainrot facts",
         "ai slideshow facts", "ai facts compilation",
     ],
+    "motion": [
+        # ── Movie edits (the bread and butter) ──
+        "wolf of wall street edit", "wolf of wall street sigma",
+        "jordan belfort edit", "jordan belfort motivation",
+        "scarface edit", "scarface tony montana",
+        "tony montana edit", "tony montana sigma",
+        "american psycho edit", "patrick bateman edit",
+        "peaky blinders edit", "thomas shelby edit",
+        "thomas shelby sigma", "tommy shelby motivation",
+        "breaking bad edit", "walter white sigma",
+        "walter white edit", "heisenberg edit",
+        "godfather edit", "michael corleone edit",
+        "goodfellas edit", "gangster movie edit",
+        # ── Money / success / hustle ──
+        "money motivation", "money edit", "counting money",
+        "cash counting", "money aesthetic", "money lifestyle",
+        "rich lifestyle", "luxury lifestyle edit",
+        "billionaire lifestyle", "millionaire motivation",
+        "success motivation", "success edit",
+        "hustle motivation", "grind motivation",
+        "grindset", "entrepreneur motivation",
+        "business motivation", "trading success",
+        "trading wins", "forex wins", "crypto wins",
+        # ── Sigma / mindset edits ──
+        "sigma male edit", "sigma edit", "sigma grindset",
+        "sigma rule", "gigachad edit", "gigachad motivation",
+        "dark knight edit", "villain arc edit",
+        "villain motivation", "lone wolf edit",
+        "lone wolf motivation", "alpha mindset",
+        # ── Motion / movement ──
+        "motion edit", "motion lifestyle", "motion money",
+        "pushing packs", "street motion", "get money edit",
+        "on the move motivation", "movement edit",
+        "making moves", "level up edit",
+        # ── Viral edit formats ──
+        "after effects edit", "phonk edit",
+        "phonk motivation", "phonk money",
+        "4k edit motivation", "cinematic edit sigma",
+        "movie scene edit", "movie motivation edit",
+        "hard edit", "edit that goes hard",
+        "this edit goes crazy", "cold edit",
+    ],
 }
 
 # ─── Viral Caption Search ────────────────────────────────────────────
@@ -171,6 +213,23 @@ VIRAL_CAPTIONS = [
     "this story is insane minecraft parkour",
     "reddit stories with minecraft parkour",
     "storytime that will keep you up at night",
+
+    # ── Motion / money / sigma edits ──
+    "this edit goes hard",
+    "wolf of wall street never gets old",
+    "jordan belfort was different",
+    "money is the motive",
+    "the grind never stops",
+    "sigma rule number one",
+    "he was built different",
+    "this is what motion looks like",
+    "scarface understood the game",
+    "thomas shelby was not a man to be messed with",
+    "the only way is up",
+    "cold edit that goes crazy",
+    "phonk edit money motivation",
+    "billionaire mindset hits different",
+    "trading wins compilation",
 ]
 
 # ─── Niche Relevance Filter ──────────────────────────────────────────
@@ -222,6 +281,18 @@ NICHE_REQUIRED_TERMS = {
         "country", "japan", "piezoelectric", "invention",
         "science", "history", "technology", "ai",
         "brainrot", "brain rot", "narrated",
+    ],
+    "motion": [
+        "money", "cash", "rich", "wealth", "million", "billion",
+        "hustle", "grind", "success", "motivation", "sigma",
+        "wolf", "belfort", "scarface", "montana", "bateman",
+        "shelby", "peaky", "breaking bad", "heisenberg",
+        "godfather", "corleone", "gangster", "boss",
+        "edit", "phonk", "motion", "movement", "level up",
+        "trading", "forex", "crypto", "profit", "wins",
+        "entrepreneur", "business", "empire", "luxury",
+        "villain", "lone wolf", "alpha", "gigachad",
+        "cold", "hard", "goes crazy", "pushing",
     ],
 }
 
