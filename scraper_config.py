@@ -143,6 +143,16 @@ NICHES = {
         "pushing packs", "street motion", "get money edit",
         "on the move motivation", "movement edit",
         "making moves", "level up edit",
+        # ── Meme / gangster money crossover ──
+        "hood money meme", "gangster meme money",
+        "money meme edit", "money meme compilation",
+        "trap money edit", "trap lifestyle edit",
+        "hood motivation", "street money motivation",
+        "gangster lifestyle edit", "mafia edit",
+        "narcos edit", "pablo escobar edit",
+        "money printer", "money flex edit",
+        "bag secured", "securing the bag edit",
+        "get rich edit", "money dance",
         # ── Viral edit formats ──
         "after effects edit", "phonk edit",
         "phonk motivation", "phonk money",
