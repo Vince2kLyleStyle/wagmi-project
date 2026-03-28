@@ -55,7 +55,7 @@ def save_urls(results, filepath):
 
 
 def run_niche(niche_name, keywords, args, existing_urls):
-    """Scrape + download for a single niche. Returns count of new videos."""
+    """Scrape + download for a single niche. Saves after EACH keyword so progress is never lost."""
     set_active_niche(niche_name)
     download_dir = os.path.join(cfg.DOWNLOAD_DIR, niche_name)
 
@@ -65,59 +65,66 @@ def run_niche(niche_name, keywords, args, existing_urls):
     print(f"  Download: {download_dir}")
     print(f"{'═' * 54}")
 
-    results = scrape_tiktok(
-        keywords=keywords,
-        max_per_keyword=args.max,
-        min_views=args.min_views,
-        min_likes=args.min_likes,
-        scroll_count=args.scrolls,
-        headless=not args.no_headless,
-        min_engagement_ratio=args.min_engagement,
-        min_interactions=args.min_interactions,
-    )
+    total_new = 0
 
-    if not results:
-        print(f"\n  ⚠  No videos found for '{niche_name}'")
-        return 0
+    for ki, keyword in enumerate(keywords, 1):
+        print(f"\n  ── Keyword {ki}/{len(keywords)}: {keyword} ──")
 
-    new_results = [r for r in results if r["url"] not in existing_urls]
-    # Add to existing set so cross-niche dedup works
-    for r in new_results:
-        existing_urls.add(r["url"])
-
-    print(f"\n  📊  {niche_name}: {len(results)} found, {len(new_results)} new")
-
-    if not new_results:
-        print(f"  All videos already scraped for '{niche_name}'.")
-        return 0
-
-    save_urls(new_results, args.output)
-
-    # Print results — show engagement so you can see quality at a glance
-    for r in new_results[:10]:  # Show first 10
-        views = f"{r['views']:>10,}" if r["views"] else "   unknown"
-        ratio = f"{r['likes']/r['views']*100:.1f}%" if r.get("views") and r.get("likes") else "  n/a"
-        print(f"  {views} views | {ratio:>5} eng | {r['url']}")
-    if len(new_results) > 10:
-        print(f"  ... and {len(new_results) - 10} more")
-
-    # Download via Telegram
-    if args.no_telegram:
-        pass
-    else:
-        urls = [r["url"] for r in new_results]
-        if args.no_download:
-            sent, failed = send_urls_sync(urls)
-            print(f"  📱  Sent {sent}, failed {failed}")
-        else:
-            sent, downloaded, failed = send_and_download_sync(
-                urls, download_dir=download_dir
+        try:
+            results = scrape_tiktok(
+                keywords=[keyword],
+                max_per_keyword=args.max,
+                min_views=args.min_views,
+                min_likes=args.min_likes,
+                scroll_count=args.scrolls,
+                headless=not args.no_headless,
+                min_engagement_ratio=args.min_engagement,
+                min_interactions=args.min_interactions,
             )
-            print(f"  📱  Sent {sent}, downloaded {downloaded}, failed {failed}")
-            if downloaded > 0:
-                print(f"  📂  Saved to: {download_dir}")
+        except Exception as e:
+            print(f"  ⚠  Error scraping '{keyword}': {e}")
+            print(f"  ⚠  Continuing to next keyword...")
+            continue
 
-    return len(new_results)
+        if not results:
+            continue
+
+        new_results = [r for r in results if r["url"] not in existing_urls]
+        for r in new_results:
+            existing_urls.add(r["url"])
+
+        if not new_results:
+            print(f"  All videos already scraped for '{keyword}'.")
+            continue
+
+        # Save URLs immediately
+        save_urls(new_results, args.output)
+        total_new += len(new_results)
+
+        # Show top results
+        for r in new_results[:5]:
+            views = f"{r['views']:>10,}" if r["views"] else "   unknown"
+            ratio = f"{r['likes']/r['views']*100:.1f}%" if r.get("views") and r.get("likes") else "  n/a"
+            print(f"    {views} views | {ratio:>5} eng | {r['url']}")
+        if len(new_results) > 5:
+            print(f"    ... and {len(new_results) - 5} more")
+
+        # Download immediately after each keyword
+        if not args.no_telegram:
+            urls = [r["url"] for r in new_results]
+            if args.no_download:
+                sent, failed = send_urls_sync(urls)
+                print(f"  📱  Sent {sent}, failed {failed}")
+            else:
+                sent, downloaded, failed = send_and_download_sync(
+                    urls, download_dir=download_dir
+                )
+                print(f"  📱  Sent {sent}, downloaded {downloaded}, failed {failed}")
+
+        print(f"  ✅  Running total: {total_new} new videos saved")
+
+    print(f"\n  📊  {niche_name}: {total_new} total new videos")
+    return total_new
 
 
 def main():
