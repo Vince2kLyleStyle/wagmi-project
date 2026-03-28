@@ -255,18 +255,34 @@ def apply_watermark(video_path: str) -> str | None:
 
 # ─── Pinned Comment ───────────────────────────────────────────────
 
-def pin_comment_on_reel(cl: Client, media_id: str) -> bool:
+def pin_comment_on_reel(cl: Client, media_id: str, media_pk: str = "") -> bool:
     """Post a comment and pin it on the uploaded reel."""
     if not config.PIN_COMMENT_ENABLED:
         return False
 
     comment_text = random.choice(config.PIN_COMMENTS)
     try:
+        # Post the comment
         comment = cl.media_comment(media_id, comment_text)
         comment_pk = comment.pk
-        time.sleep(random.uniform(1, 3))
-        cl.comment_pin(media_id, comment_pk)
-        print(f"  [pin] Pinned: \"{comment_text}\"")
+        time.sleep(random.uniform(2, 5))
+
+        # Pin using media_pk (numeric ID) — Instagram's pin endpoint needs this
+        pin_id = media_pk or media_id
+        try:
+            cl.comment_pin(pin_id, comment_pk)
+            print(f"  [pin] Pinned: \"{comment_text}\"")
+        except Exception as pin_err:
+            # If pin fails, try with the other ID format
+            alt_id = media_id if pin_id == media_pk else media_pk
+            if alt_id and alt_id != pin_id:
+                try:
+                    cl.comment_pin(alt_id, comment_pk)
+                    print(f"  [pin] Pinned (alt): \"{comment_text}\"")
+                except Exception:
+                    print(f"  [pin] Comment posted but pin failed: {pin_err}")
+            else:
+                print(f"  [pin] Comment posted but pin failed: {pin_err}")
         return True
     except Exception as e:
         print(f"  [pin] Comment/pin error (non-fatal): {e}")
@@ -300,8 +316,8 @@ def upload_reel(cl: Client, video_path: str) -> str | None:
 
     try:
         media = cl.clip_upload(**kwargs)
-        media_id = media.pk if hasattr(media, "pk") else str(media)
-        media_full_id = media.id if hasattr(media, "id") else str(media_id)
+        media_pk = str(media.pk) if hasattr(media, "pk") else str(media)
+        media_full_id = media.id if hasattr(media, "id") else media_pk
 
         # Clean up temp files
         if thumbnail and os.path.exists(thumbnail):
@@ -311,9 +327,9 @@ def upload_reel(cl: Client, video_path: str) -> str | None:
 
         # Pin comment on the new reel
         time.sleep(random.uniform(2, 5))
-        pin_comment_on_reel(cl, media_full_id)
+        pin_comment_on_reel(cl, media_full_id, media_pk=media_pk)
 
-        return str(media_id)
+        return str(media_pk)
 
     except (PleaseWaitFewMinutes, RateLimitError) as e:
         print(f"\n  [!!] Rate limited: {e}")
