@@ -34,15 +34,15 @@ BATCH_SIZE = 3         # videos per mini-batch (2-3 posts per batch)
 # You'll paste the new one from the reel when you have it.
 VIRAL_CAPTIONS = [
     (
-        "الولايات المتحدة تحوّل الذكاء الاصطناعي إلى قوة يومية\n"
-        "في الولايات المتحدة، يتم دمج تقنيات الذكاء الاصطناعي في مختلف جوانب الحياة، "
-        "من المساعدات الذكية إلى تحليل البيانات واتخاذ القرارات.\n"
-        "تُستخدم هذه الأنظمة في مجالات مثل الرعاية الصحية، حيث تساعد في تشخيص الأمراض، "
-        "وفي النقل لتطوير السيارات ذاتية القيادة.\n"
-        "كما تساهم في تحسين الإنتاجية داخل الشركات وتقديم حلول أسرع وأكثر دقة.\n"
-        "تُظهر هذه الابتكارات كيف يمكن للذكاء الاصطناعي أن يصبح جزءًا أساسيًا من الحياة اليومية.\n"
-        "إنه نهج متقدم يحوّل التكنولوجيا إلى قوة تدعم المستقبل.\n"
-        "#USA #ArtificialIntelligence #Innovation #FutureTech #SmartSystems"
+        "🇳🇱 Netherlands is transforming its cities into climate-resilient hubs!\n"
+        "In Rotterdam, innovative \"water plazas\" are being built to tackle flooding "
+        "while doubling as public spaces. These smart urban designs store excess rainwater "
+        "during storms and release it slowly—reducing pressure on drainage systems. "
+        "Beyond flood control, green rooftops and urban gardens help cool the city, "
+        "improve air quality, and boost biodiversity. A powerful example of how cities "
+        "can adapt to climate change while enhancing everyday life 🌍💧🌿\n"
+        "#Netherlands #Rotterdam #ClimateAction #GreenCity #Sustainability "
+        "UrbanDesign EcoFuture SmartCity ClimateChange GreenLiving"
     ),
 ]
 USE_SAME_CAPTION = True
