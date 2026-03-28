@@ -408,13 +408,54 @@ def gaussian_delay(center: float, spread: float,
 
 # ─── Main Loop ─────────────────────────────────────────────────────
 
+def get_video_duration(video_path: str) -> float:
+    """Get video duration in seconds using ffprobe."""
+    try:
+        probe = subprocess.run(
+            [config.FFMPEG_PATH.replace("ffmpeg", "ffprobe"),
+             "-v", "error",
+             "-show_entries", "format=duration",
+             "-of", "default=noprint_wrappers=1:nokey=1",
+             video_path],
+            capture_output=True, text=True, timeout=15,
+        )
+        return float(probe.stdout.strip())
+    except Exception:
+        return 0.0
+
+
 def get_video_queue() -> list[str]:
-    """Gather all .mp4 files from the video directory, sorted by name."""
+    """Gather all .mp4 files, auto-delete any over MAX_VIDEO_DURATION."""
     pattern = os.path.join(config.VIDEO_DIR, "*.mp4")
-    videos = sorted(glob.glob(pattern))
-    if not videos:
+    all_videos = sorted(glob.glob(pattern))
+
+    if not all_videos:
         print(f"[!!] No .mp4 files found in {config.VIDEO_DIR}")
         sys.exit(1)
+
+    max_dur = getattr(config, "MAX_VIDEO_DURATION", 0)
+    if not max_dur:
+        return all_videos
+
+    videos = []
+    removed = 0
+    for vpath in all_videos:
+        dur = get_video_duration(vpath)
+        if dur > max_dur:
+            fname = os.path.basename(vpath)
+            print(f"  [--] Removing {fname} ({dur:.0f}s > {max_dur}s)")
+            os.remove(vpath)
+            removed += 1
+        else:
+            videos.append(vpath)
+
+    if removed:
+        print(f"  [--] Auto-removed {removed} videos over {max_dur}s\n")
+
+    if not videos:
+        print(f"[!!] No videos under {max_dur}s found in {config.VIDEO_DIR}")
+        sys.exit(1)
+
     return videos
 
 

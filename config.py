@@ -87,6 +87,10 @@ THROTTLE_SLEEP_MAX = 7200    # 120 min
 USE_FFMPEG_THUMBNAIL = True
 FFMPEG_PATH = "ffmpeg"
 
+# ─── Video Duration Filter ───────────────────────────────────────────
+# Auto-delete videos longer than this (seconds). 0 = no limit.
+MAX_VIDEO_DURATION = 30
+
 # ─── Logging ────────────────────────────────────────────────────────
 SUCCESS_LOG = os.path.join(os.path.dirname(__file__), "success.txt")
 DELETE_AFTER_UPLOAD = True

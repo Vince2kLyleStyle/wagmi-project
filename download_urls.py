@@ -139,6 +139,32 @@ def main():
         print(f"  Batch result: {downloaded} downloaded, {failed} failed")
         print(f"  Running total: {total_downloaded} downloaded\n")
 
+    # Auto-delete videos over max duration
+    max_dur = 30  # seconds
+    removed = 0
+    for fname in os.listdir(download_dir):
+        if not fname.endswith(".mp4"):
+            continue
+        fpath = os.path.join(download_dir, fname)
+        try:
+            import subprocess
+            probe = subprocess.run(
+                ["ffprobe", "-v", "error",
+                 "-show_entries", "format=duration",
+                 "-of", "default=noprint_wrappers=1:nokey=1",
+                 fpath],
+                capture_output=True, text=True, timeout=15,
+            )
+            dur = float(probe.stdout.strip())
+            if dur > max_dur:
+                os.remove(fpath)
+                removed += 1
+                print(f"  [--] Removed {fname} ({dur:.0f}s > {max_dur}s)")
+        except Exception:
+            pass
+    if removed:
+        print(f"  [--] Auto-removed {removed} videos over {max_dur}s\n")
+
     print(f"{'═' * 54}")
     print(f"  DONE!")
     print(f"  Downloaded: {total_downloaded}")
