@@ -69,8 +69,10 @@ def countdown_timer(seconds: int, label: str = "Batch delay") -> None:
 
 def generate_branded_thumbnail() -> str | None:
     """
-    Generate a static white thumbnail with black $MOTION text.
-    Same image every time = consistent grid on the profile.
+    Generate a dark, branded $MOTION thumbnail.
+    Black-to-dark-gray gradient background with gold $MOTION text
+    and a subtle gold line accent. Looks premium and on-brand for
+    the money/sigma/grindset aesthetic.
     Returns path to temp .jpg or None on failure.
     """
     if not config.USE_FFMPEG_THUMBNAIL:
@@ -81,20 +83,75 @@ def generate_branded_thumbnail() -> str | None:
 
         # Instagram Reel thumbnail is 1080x1920 (9:16)
         width, height = 1080, 1920
-        img = Image.new("RGB", (width, height), color="white")
+
+        # Dark gradient background (black at top → dark charcoal at bottom)
+        img = Image.new("RGB", (width, height))
         draw = ImageDraw.Draw(img)
 
-        text = "$MOTION"
+        # Draw vertical gradient
+        for y in range(height):
+            # Black (10,10,10) → Dark charcoal (30,30,35)
+            ratio = y / height
+            r = int(10 + 20 * ratio)
+            g = int(10 + 20 * ratio)
+            b = int(10 + 25 * ratio)
+            draw.line([(0, y), (width, y)], fill=(r, g, b))
 
-        # Try to use a bold system font, fall back to default
+        # Subtle radial vignette — darker edges, slightly lighter center
+        for y in range(height):
+            for x in range(0, width, 4):  # step by 4 for speed
+                dx = (x - width / 2) / (width / 2)
+                dy = (y - height / 2) / (height / 2)
+                dist = min(1.0, (dx * dx + dy * dy) ** 0.5)
+                if dist > 0.5:
+                    darken = int((dist - 0.5) * 30)
+                    px = img.getpixel((x, y))
+                    img.putpixel((x, y), (
+                        max(0, px[0] - darken),
+                        max(0, px[1] - darken),
+                        max(0, px[2] - darken),
+                    ))
+                    # Fill the 4-pixel block
+                    for xo in range(1, min(4, width - x)):
+                        img.putpixel((x + xo, y), img.getpixel((x, y)))
+
+        draw = ImageDraw.Draw(img)
+
+        # Gold color for the text
+        gold = (212, 175, 55)
+        gold_dim = (160, 130, 40)
+
+        # Horizontal gold accent lines
+        line_y_top = height // 2 - 120
+        line_y_bot = height // 2 + 100
+        line_margin = 150
+        draw.line([(line_margin, line_y_top), (width - line_margin, line_y_top)],
+                  fill=gold_dim, width=2)
+        draw.line([(line_margin, line_y_bot), (width - line_margin, line_y_bot)],
+                  fill=gold_dim, width=2)
+
+        # Small diamond accents on the lines
+        diamond_size = 6
+        for ly in [line_y_top, line_y_bot]:
+            cx = width // 2
+            draw.polygon([
+                (cx, ly - diamond_size),
+                (cx + diamond_size, ly),
+                (cx, ly + diamond_size),
+                (cx - diamond_size, ly),
+            ], fill=gold)
+
+        # Main text: $MOTION
+        text = "$MOTION"
         font = None
-        font_size = 120
-        # Common bold fonts on Windows
+        font_size = 130
+
         bold_fonts = [
-            "C:/Windows/Fonts/arialbd.ttf",
             "C:/Windows/Fonts/impact.ttf",
+            "C:/Windows/Fonts/arialbd.ttf",
             "C:/Windows/Fonts/calibrib.ttf",
-            "C:/Windows/Fonts/segoeui.ttf",
+            "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf",
+            "/System/Library/Fonts/Helvetica.ttc",
         ]
         for font_path in bold_fonts:
             if os.path.exists(font_path):
@@ -110,14 +167,17 @@ def generate_branded_thumbnail() -> str | None:
             except Exception:
                 font = ImageFont.load_default()
 
-        # Get text bounding box and center it
+        # Center the main text
         bbox = draw.textbbox((0, 0), text, font=font)
-        text_width = bbox[2] - bbox[0]
-        text_height = bbox[3] - bbox[1]
-        x = (width - text_width) // 2
-        y = (height - text_height) // 2
+        text_w = bbox[2] - bbox[0]
+        text_h = bbox[3] - bbox[1]
+        x = (width - text_w) // 2
+        y = (height - text_h) // 2 - 20
 
-        draw.text((x, y), text, fill="black", font=font)
+        # Text shadow for depth
+        draw.text((x + 3, y + 3), text, fill=(40, 30, 10), font=font)
+        # Main gold text
+        draw.text((x, y), text, fill=gold, font=font)
 
         thumb_path = os.path.join(
             tempfile.gettempdir(),
