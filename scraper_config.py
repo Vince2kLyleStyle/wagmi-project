@@ -182,6 +182,20 @@ NICHES = {
         "movie scene edit", "movie motivation edit",
         "hard edit", "edit that goes hard",
         "this edit goes crazy", "cold edit",
+        # ── Funny motion / money humor (these go viral) ──
+        "wolf of wall street funny", "scarface funny scene",
+        "peaky blinders funny", "breaking bad funny",
+        "american psycho funny", "patrick bateman meme",
+        "sigma male funny", "sigma meme", "gigachad meme",
+        "jordan belfort funny", "money meme funny",
+        "gangster movie funny scene", "funny movie edit",
+        "funny villain edit", "funny sigma edit",
+        "movie scene meme", "hood funny money",
+        "counting money funny", "rich people funny",
+        "hustle meme funny", "grindset meme",
+        "thomas shelby funny", "walter white meme",
+        "joker funny scene", "batman funny edit",
+        "funny money flex", "money humor edit",
     ],
 }
 
@@ -273,6 +287,13 @@ CAPTION_BLOCKLIST = [
     "fan edit", "fanfic", "wattpad",
     "sad edit", "crying edit", "depression",
     "self harm", "mental health vent",
+    # Boring motivational speeches (not funny, not edits)
+    "motivational speech", "morning routine motivation",
+    "5am routine", "wake up at 5", "daily routine",
+    "self improvement journey", "day in my life",
+    "how to be successful", "10 rules of success",
+    "motivational podcast", "podcast clip motivation",
+    "life advice", "life lessons", "storytime",
 ]
 
 # Require at least ONE of these terms in the caption for niche relevance.
@@ -316,8 +337,8 @@ MAX_VIDEOS_PER_ACCOUNT = 30
 MAX_VIDEOS_PER_KEYWORD = 200            # Videos to collect per keyword
 MIN_VIEWS = 50_000                     # Higher bar — motion niche has tons of viral content
 MIN_LIKES = 1_000                      # Minimum like count — filters out dead content
-MIN_ENGAGEMENT_RATIO = 0.03            # Min likes/views ratio (3% = quality content only)
-MIN_INTERACTIONS = 25_000              # Minimum total interactions (likes + comments + shares)
+MIN_ENGAGEMENT_RATIO = 0.04            # Min likes/views ratio (4% = funny content gets higher engagement)
+MIN_INTERACTIONS = 30_000              # Minimum total interactions — funny clips get shared heavily
 SCROLL_COUNT = 40                      # More scrolling = more videos found
 HEADLESS = True                        # Run browser without GUI
 
