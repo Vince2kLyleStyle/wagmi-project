@@ -89,7 +89,11 @@ FFMPEG_PATH = "ffmpeg"
 
 # ─── Video Duration Filter ───────────────────────────────────────────
 # Auto-delete videos longer than this (seconds). 0 = no limit.
-MAX_VIDEO_DURATION = 30
+MAX_VIDEO_DURATION = 20
+
+# ─── Video Quality Filter ────────────────────────────────────────────
+# Auto-delete videos below this resolution (height in pixels). 0 = no limit.
+MIN_VIDEO_HEIGHT = 720
 
 # ─── Logging ────────────────────────────────────────────────────────
 SUCCESS_LOG = os.path.join(os.path.dirname(__file__), "success.txt")

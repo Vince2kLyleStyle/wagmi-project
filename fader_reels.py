@@ -424,8 +424,25 @@ def get_video_duration(video_path: str) -> float:
         return 0.0
 
 
+def get_video_height(video_path: str) -> int:
+    """Get video height in pixels using ffprobe."""
+    try:
+        probe = subprocess.run(
+            [config.FFMPEG_PATH.replace("ffmpeg", "ffprobe"),
+             "-v", "error",
+             "-select_streams", "v:0",
+             "-show_entries", "stream=height",
+             "-of", "default=noprint_wrappers=1:nokey=1",
+             video_path],
+            capture_output=True, text=True, timeout=15,
+        )
+        return int(probe.stdout.strip())
+    except Exception:
+        return 0
+
+
 def get_video_queue() -> list[str]:
-    """Gather all .mp4 files, auto-delete any over MAX_VIDEO_DURATION."""
+    """Gather all .mp4 files, auto-delete long or low-quality videos."""
     pattern = os.path.join(config.VIDEO_DIR, "*.mp4")
     all_videos = sorted(glob.glob(pattern))
 
@@ -434,26 +451,45 @@ def get_video_queue() -> list[str]:
         sys.exit(1)
 
     max_dur = getattr(config, "MAX_VIDEO_DURATION", 0)
-    if not max_dur:
+    min_height = getattr(config, "MIN_VIDEO_HEIGHT", 0)
+
+    if not max_dur and not min_height:
         return all_videos
 
     videos = []
-    removed = 0
-    for vpath in all_videos:
-        dur = get_video_duration(vpath)
-        if dur > max_dur:
-            fname = os.path.basename(vpath)
-            print(f"  [--] Removing {fname} ({dur:.0f}s > {max_dur}s)")
-            os.remove(vpath)
-            removed += 1
-        else:
-            videos.append(vpath)
+    removed_dur = 0
+    removed_quality = 0
 
-    if removed:
-        print(f"  [--] Auto-removed {removed} videos over {max_dur}s\n")
+    print(f"[*] Filtering videos (max {max_dur}s, min {min_height}p)...")
+
+    for vpath in all_videos:
+        fname = os.path.basename(vpath)
+
+        # Check duration
+        if max_dur:
+            dur = get_video_duration(vpath)
+            if dur > max_dur:
+                print(f"  [--] {fname} — too long ({dur:.0f}s)")
+                os.remove(vpath)
+                removed_dur += 1
+                continue
+
+        # Check resolution
+        if min_height:
+            height = get_video_height(vpath)
+            if height > 0 and height < min_height:
+                print(f"  [--] {fname} — low quality ({height}p)")
+                os.remove(vpath)
+                removed_quality += 1
+                continue
+
+        videos.append(vpath)
+
+    if removed_dur or removed_quality:
+        print(f"  [--] Removed: {removed_dur} too long, {removed_quality} low quality\n")
 
     if not videos:
-        print(f"[!!] No videos under {max_dur}s found in {config.VIDEO_DIR}")
+        print(f"[!!] No videos passed filters in {config.VIDEO_DIR}")
         sys.exit(1)
 
     return videos
