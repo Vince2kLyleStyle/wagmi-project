@@ -59,7 +59,7 @@ WATERMARK_FONT = ""                   # leave empty for default, or path to .ttf
 
 # ─── Pinned Comment ──────────────────────────────────────────────
 # Auto-comment and pin after each upload
-PIN_COMMENT_ENABLED = True
+PIN_COMMENT_ENABLED = False
 PIN_COMMENTS = [
     "Like and follow for motion 🔥💰",
     "Follow for more motion 🐺",

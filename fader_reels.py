@@ -67,11 +67,13 @@ def countdown_timer(seconds: int, label: str = "Batch delay") -> None:
 
 # ─── Thumbnail Extraction ──────────────────────────────────────────
 
-def generate_branded_thumbnail() -> str | None:
+def generate_branded_thumbnail(video_path: str = "") -> str | None:
     """
-    Use the custom thumbnail.jpg from the project folder.
-    Same image every post = consistent branded grid.
-    Returns path to a temp copy of the thumbnail, or None on failure.
+    Thumbnail priority:
+    1. If thumbnail.jpg exists in project folder → use that (e.g. Wolf of Wall Street girl)
+    2. Otherwise → extract a frame from the video itself
+
+    Returns path to temp .jpg or None on failure.
     """
     if not config.USE_FFMPEG_THUMBNAIL:
         return None
@@ -79,26 +81,61 @@ def generate_branded_thumbnail() -> str | None:
     try:
         import shutil
 
-        # Look for thumbnail.jpg in the project directory
+        # Priority 1: Custom thumbnail.jpg
         project_dir = os.path.dirname(os.path.abspath(__file__))
         thumb_src = os.path.join(project_dir, "thumbnail.jpg")
 
-        if not os.path.exists(thumb_src):
-            print(f"  [thumbnail] thumbnail.jpg not found in {project_dir}")
+        if os.path.exists(thumb_src):
+            thumb_path = os.path.join(
+                tempfile.gettempdir(),
+                f"fader_thumb_{uuid.uuid4().hex[:8]}.jpg",
+            )
+            shutil.copy2(thumb_src, thumb_path)
+            if os.path.exists(thumb_path) and os.path.getsize(thumb_path) > 0:
+                return thumb_path
+
+        # Priority 2: Extract frame from video
+        if not video_path:
             return None
 
-        # Copy to temp file (instagrapi may delete/move the file)
+        probe = subprocess.run(
+            [config.FFMPEG_PATH.replace("ffmpeg", "ffprobe"),
+             "-v", "error",
+             "-show_entries", "format=duration",
+             "-of", "default=noprint_wrappers=1:nokey=1",
+             video_path],
+            capture_output=True, text=True, timeout=15,
+        )
+        duration = float(probe.stdout.strip())
+        if duration < 1:
+            return None
+
+        # Pick from the middle of the video (best action frames)
+        offset = random.uniform(duration * 0.25, duration * 0.75)
+
         thumb_path = os.path.join(
             tempfile.gettempdir(),
             f"fader_thumb_{uuid.uuid4().hex[:8]}.jpg",
         )
-        shutil.copy2(thumb_src, thumb_path)
+
+        subprocess.run(
+            [config.FFMPEG_PATH,
+             "-ss", str(offset),
+             "-i", video_path,
+             "-vframes", "1",
+             "-q:v", "2",
+             "-update", "1",
+             "-y", thumb_path],
+            capture_output=True, timeout=15,
+        )
 
         if os.path.exists(thumb_path) and os.path.getsize(thumb_path) > 0:
             return thumb_path
 
     except Exception as e:
         print(f"  [thumbnail] Error (non-fatal): {e}")
+
+    return None
 
     return None
 
@@ -289,7 +326,7 @@ def upload_reel(cl: Client, video_path: str) -> str | None:
         caption = random.choice(config.VIRAL_CAPTIONS)
     else:
         caption = captions.generate_caption()
-    thumbnail = generate_branded_thumbnail()
+    thumbnail = generate_branded_thumbnail(video_path)
 
     # Apply watermark overlay
     watermarked = apply_watermark(video_path)
