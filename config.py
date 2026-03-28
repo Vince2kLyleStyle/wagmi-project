@@ -33,20 +33,23 @@ BATCH_SIZE = 3         # videos per mini-batch (2-3 posts per batch)
 # The Japan/Titanic ones are tested and work. Motion ones add brand.
 # You'll paste the new one from the reel when you have it.
 VIRAL_CAPTIONS = [
-    # ── Proven algorithm catchers (DO NOT REMOVE) ──
     (
-        "#🇯🇵Japan is turning footsteps into electricity! "
-        "Using piezoelectric tiles, every step you take generates a small amount of energy. "
-        "Millions of steps together can power LED lights and displays in busy places like "
-        "Shibuya Station. A brilliant way to create a sustainable and smart city • turning m"
+        "🇺🇸 الولايات المتحدة تحوّل الذكاء الاصطناعي إلى قوة يومية\n"
+        "في الولايات المتحدة، يتم دمج تقنيات الذكاء الاصطناعي في مختلف جوانب الحياة، "
+        "من المساعدات الذكية إلى تحليل البيانات واتخاذ القرارات.\n"
+        "تُستخدم هذه الأنظمة في مجالات مثل الرعاية الصحية، حيث تساعد في تشخيص الأمراض، "
+        "وفي النقل لتطوير السيارات ذاتية القيادة.\n"
+        "كما تساهم في تحسين الإنتاجية داخل الشركات وتقديم حلول أسرع وأكثر دقة.\n"
+        "تُظهر هذه الابتكارات كيف يمكن للذكاء الاصطناعي أن يصبح جزءًا أساسيًا من الحياة اليومية.\n"
+        "إنه نهج متقدم يحوّل التكنولوجيا إلى قوة تدعم المستقبل.\n"
+        "#USA #ArtificialIntelligence #Innovation #FutureTech #SmartSystems"
     ),
-    # Add more proven captions here as you find them
 ]
 USE_SAME_CAPTION = True
 
 # ─── Watermark ───────────────────────────────────────────────────
 # Overlay text on each video before uploading
-WATERMARK_ENABLED = True
+WATERMARK_ENABLED = False
 WATERMARK_TEXT = "$MOTION"
 WATERMARK_FONTSIZE = 42
 WATERMARK_OPACITY = 0.85

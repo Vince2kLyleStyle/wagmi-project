@@ -67,76 +67,69 @@ def countdown_timer(seconds: int, label: str = "Batch delay") -> None:
 
 # ─── Thumbnail Extraction ──────────────────────────────────────────
 
-def extract_random_thumbnail(video_path: str) -> str | None:
+def generate_branded_thumbnail() -> str | None:
     """
-    Extract a frame from the best part of the video and overlay $MOTION branding.
-    Picks a frame from the middle 50% of the video (where the action usually is).
-    Burns the watermark text onto the thumbnail for a consistent grid look.
+    Generate a static white thumbnail with black $MOTION text.
+    Same image every time = consistent grid on the profile.
     Returns path to temp .jpg or None on failure.
     """
     if not config.USE_FFMPEG_THUMBNAIL:
         return None
 
     try:
-        # Get video duration via ffprobe
-        probe = subprocess.run(
-            [config.FFMPEG_PATH.replace("ffmpeg", "ffprobe"),
-             "-v", "error",
-             "-show_entries", "format=duration",
-             "-of", "default=noprint_wrappers=1:nokey=1",
-             video_path],
-            capture_output=True, text=True, timeout=15,
-        )
-        duration = float(probe.stdout.strip())
-        if duration < 1:
-            return None
+        from PIL import Image, ImageDraw, ImageFont
 
-        # Pick from the middle 50% of the video (25%-75%) — best action frames
-        offset = random.uniform(duration * 0.25, duration * 0.75)
+        # Instagram Reel thumbnail is 1080x1920 (9:16)
+        width, height = 1080, 1920
+        img = Image.new("RGB", (width, height), color="white")
+        draw = ImageDraw.Draw(img)
+
+        text = "$MOTION"
+
+        # Try to use a bold system font, fall back to default
+        font = None
+        font_size = 120
+        # Common bold fonts on Windows
+        bold_fonts = [
+            "C:/Windows/Fonts/arialbd.ttf",
+            "C:/Windows/Fonts/impact.ttf",
+            "C:/Windows/Fonts/calibrib.ttf",
+            "C:/Windows/Fonts/segoeui.ttf",
+        ]
+        for font_path in bold_fonts:
+            if os.path.exists(font_path):
+                try:
+                    font = ImageFont.truetype(font_path, font_size)
+                    break
+                except Exception:
+                    continue
+
+        if font is None:
+            try:
+                font = ImageFont.truetype("arial.ttf", font_size)
+            except Exception:
+                font = ImageFont.load_default()
+
+        # Get text bounding box and center it
+        bbox = draw.textbbox((0, 0), text, font=font)
+        text_width = bbox[2] - bbox[0]
+        text_height = bbox[3] - bbox[1]
+        x = (width - text_width) // 2
+        y = (height - text_height) // 2
+
+        draw.text((x, y), text, fill="black", font=font)
 
         thumb_path = os.path.join(
             tempfile.gettempdir(),
             f"fader_thumb_{uuid.uuid4().hex[:8]}.jpg",
         )
-
-        # Build filter — extract frame + overlay branding if watermark enabled
-        if config.WATERMARK_ENABLED:
-            text = config.WATERMARK_TEXT.replace("'", "'\\''").replace(":", "\\:")
-            fontsize = config.WATERMARK_FONTSIZE
-            color = config.WATERMARK_COLOR
-            # Center the watermark on the thumbnail for grid consistency
-            vf = (
-                f"drawtext=text='{text}'"
-                f":fontsize={fontsize}"
-                f":fontcolor={color}"
-                f":x=(w-tw)/2:y=h-th-40"
-                f":borderw=3:bordercolor=black@0.6"
-            )
-            cmd = [
-                config.FFMPEG_PATH,
-                "-ss", str(offset),
-                "-i", video_path,
-                "-vframes", "1",
-                "-vf", vf,
-                "-q:v", "2",
-                "-y", thumb_path,
-            ]
-        else:
-            cmd = [
-                config.FFMPEG_PATH,
-                "-ss", str(offset),
-                "-i", video_path,
-                "-vframes", "1",
-                "-q:v", "2",
-                "-y", thumb_path,
-            ]
-
-        subprocess.run(cmd, capture_output=True, timeout=15)
+        img.save(thumb_path, "JPEG", quality=95)
 
         if os.path.exists(thumb_path) and os.path.getsize(thumb_path) > 0:
             return thumb_path
+
     except Exception as e:
-        print(f"  [thumbnail] ffmpeg error (non-fatal): {e}")
+        print(f"  [thumbnail] Error (non-fatal): {e}")
 
     return None
 
@@ -327,7 +320,7 @@ def upload_reel(cl: Client, video_path: str) -> str | None:
         caption = random.choice(config.VIRAL_CAPTIONS)
     else:
         caption = captions.generate_caption()
-    thumbnail = extract_random_thumbnail(video_path)
+    thumbnail = generate_branded_thumbnail()
 
     # Apply watermark overlay
     watermarked = apply_watermark(video_path)
