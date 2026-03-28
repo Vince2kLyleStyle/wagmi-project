@@ -55,7 +55,7 @@ def save_urls(results, filepath):
 
 
 def run_niche(niche_name, keywords, args, existing_urls):
-    """Scrape + download for a single niche. Saves after EACH keyword so progress is never lost."""
+    """Scrape + download for a single niche. One browser, saves after EACH keyword."""
     set_active_niche(niche_name)
     download_dir = os.path.join(cfg.DOWNLOAD_DIR, niche_name)
 
@@ -67,51 +67,33 @@ def run_niche(niche_name, keywords, args, existing_urls):
 
     total_new = 0
 
-    for ki, keyword in enumerate(keywords, 1):
-        print(f"\n  ── Keyword {ki}/{len(keywords)}: {keyword} ──")
+    def on_keyword_done(keyword, new_results):
+        """Called after each keyword — save URLs and optionally download."""
+        nonlocal total_new
 
-        try:
-            results = scrape_tiktok(
-                keywords=[keyword],
-                max_per_keyword=args.max,
-                min_views=args.min_views,
-                min_likes=args.min_likes,
-                scroll_count=args.scrolls,
-                headless=not args.no_headless,
-                min_engagement_ratio=args.min_engagement,
-                min_interactions=args.min_interactions,
-            )
-        except Exception as e:
-            print(f"  ⚠  Error scraping '{keyword}': {e}")
-            print(f"  ⚠  Continuing to next keyword...")
-            continue
-
-        if not results:
-            continue
-
-        new_results = [r for r in results if r["url"] not in existing_urls]
-        for r in new_results:
+        # Filter out already-scraped URLs
+        fresh = [r for r in new_results if r["url"] not in existing_urls]
+        for r in fresh:
             existing_urls.add(r["url"])
 
-        if not new_results:
-            print(f"  All videos already scraped for '{keyword}'.")
-            continue
+        if not fresh:
+            return
 
-        # Save URLs immediately
-        save_urls(new_results, args.output)
-        total_new += len(new_results)
+        # Save immediately
+        save_urls(fresh, args.output)
+        total_new += len(fresh)
 
         # Show top results
-        for r in new_results[:5]:
+        for r in fresh[:5]:
             views = f"{r['views']:>10,}" if r["views"] else "   unknown"
             ratio = f"{r['likes']/r['views']*100:.1f}%" if r.get("views") and r.get("likes") else "  n/a"
             print(f"    {views} views | {ratio:>5} eng | {r['url']}")
-        if len(new_results) > 5:
-            print(f"    ... and {len(new_results) - 5} more")
+        if len(fresh) > 5:
+            print(f"    ... and {len(fresh) - 5} more")
 
-        # Download immediately after each keyword
+        # Download if Telegram is enabled
         if not args.no_telegram:
-            urls = [r["url"] for r in new_results]
+            urls = [r["url"] for r in fresh]
             if args.no_download:
                 sent, failed = send_urls_sync(urls)
                 print(f"  📱  Sent {sent}, failed {failed}")
@@ -122,6 +104,19 @@ def run_niche(niche_name, keywords, args, existing_urls):
                 print(f"  📱  Sent {sent}, downloaded {downloaded}, failed {failed}")
 
         print(f"  ✅  Running total: {total_new} new videos saved")
+
+    # One browser session for ALL keywords — callback saves after each
+    scrape_tiktok(
+        keywords=keywords,
+        max_per_keyword=args.max,
+        min_views=args.min_views,
+        min_likes=args.min_likes,
+        scroll_count=args.scrolls,
+        headless=not args.no_headless,
+        min_engagement_ratio=args.min_engagement,
+        min_interactions=args.min_interactions,
+        on_keyword_done=on_keyword_done,
+    )
 
     print(f"\n  📊  {niche_name}: {total_new} total new videos")
     return total_new

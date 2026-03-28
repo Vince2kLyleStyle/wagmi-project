@@ -121,9 +121,14 @@ def login_to_tiktok():
 
 def scrape_tiktok(keywords, max_per_keyword=20, min_views=0, min_likes=0,
                   scroll_count=5, headless=True, min_engagement_ratio=0.0,
-                  min_interactions=0):
+                  min_interactions=0, on_keyword_done=None):
     """
     Scrape TikTok search results for given keywords.
+
+    Args:
+        on_keyword_done: Optional callback(keyword, new_results) called after
+                         each keyword finishes. Use this to save/download
+                         incrementally so nothing is lost on crash.
 
     Returns list of dicts: [{"url": str, "views": int, "keyword": str}, ...]
     """
@@ -143,104 +148,117 @@ def scrape_tiktok(keywords, max_per_keyword=20, min_views=0, min_likes=0,
         context = p.chromium.launch_persistent_context(
             BROWSER_PROFILE_DIR,
             headless=headless,
-            # channel="chrome",  # Use bundled Chromium instead of system Chrome
             args=STEALTH_ARGS,
             viewport={"width": 1280, "height": 900},
         )
         page = context.new_page()
 
-        for keyword in keywords:
-            print(f"\n🔍  Searching TikTok for: {keyword}")
-            url = f"https://www.tiktok.com/search/video?q={keyword}"
+        for ki, keyword in enumerate(keywords, 1):
+            print(f"\n  ── Keyword {ki}/{len(keywords)} ──")
+            keyword_results = []
 
             try:
-                page.goto(url, wait_until="domcontentloaded", timeout=30000)
-            except Exception as e:
-                print(f"   ⚠  Failed to load search page: {e}")
-                continue
+                print(f"\n🔍  Searching TikTok for: {keyword}")
+                url = f"https://www.tiktok.com/search/video?q={keyword}"
 
-            # Wait for content to fully render
-            time.sleep(random.uniform(4, 7))
-
-            # Dismiss cookie/login popups if they appear
-            _dismiss_popups(page)
-
-            # Wait a bit more after dismissing popups
-            time.sleep(random.uniform(1, 2))
-
-            # Scroll to load more results (stop early if no new content)
-            prev_count = 0
-            stale_scrolls = 0
-            for i in range(scroll_count):
-                page.evaluate("window.scrollTo(0, document.body.scrollHeight)")
-                time.sleep(random.uniform(3, 5))
-                # Nudge scroll up then back down to trigger lazy loading
-                page.evaluate("window.scrollBy(0, -300)")
-                time.sleep(random.uniform(0.5, 1))
-                page.evaluate("window.scrollTo(0, document.body.scrollHeight)")
-                time.sleep(random.uniform(1.5, 2.5))
-                # Check if new videos loaded
-                cur_count = len(page.query_selector_all('a[href*="/video/"]'))
-                print(f"   📜  Scroll {i + 1}/{scroll_count} ({cur_count} links)")
-                if cur_count <= prev_count:
-                    stale_scrolls += 1
-                    if stale_scrolls >= 4:
-                        print(f"   ⏹  No new videos loading, stopping early")
-                        break
-                else:
-                    stale_scrolls = 0
-                prev_count = cur_count
-
-            # Extract video links and metadata
-            videos = _extract_videos(page, keyword, min_views, min_likes, min_engagement_ratio, min_interactions)
-
-            new_count = 0
-            for vid in videos:
-                if vid["url"] not in seen_urls and new_count < max_per_keyword:
-                    seen_urls.add(vid["url"])
-                    all_results.append(vid)
-                    new_count += 1
-
-            print(f"   ✅  Found {new_count} videos for '{keyword}'")
-
-            # Try "Most liked" sort tab for additional results
-            if new_count < max_per_keyword:
                 try:
-                    liked_tab = page.query_selector(
-                        'div[data-e2e="search-sort-most-liked"], '
-                        'span:has-text("Most liked"), '
-                        'div[role="tab"]:has-text("Most liked")'
-                    )
-                    if liked_tab:
-                        liked_tab.click()
-                        time.sleep(random.uniform(3, 5))
+                    page.goto(url, wait_until="domcontentloaded", timeout=30000)
+                except Exception as e:
+                    print(f"   ⚠  Failed to load search page: {e}")
+                    continue
 
-                        # Scroll the "Most liked" tab
-                        prev_count = 0
+                # Wait for content to fully render
+                time.sleep(random.uniform(4, 7))
+
+                # Dismiss cookie/login popups if they appear
+                _dismiss_popups(page)
+
+                # Wait a bit more after dismissing popups
+                time.sleep(random.uniform(1, 2))
+
+                # Scroll to load more results (stop early if no new content)
+                prev_count = 0
+                stale_scrolls = 0
+                for i in range(scroll_count):
+                    page.evaluate("window.scrollTo(0, document.body.scrollHeight)")
+                    time.sleep(random.uniform(3, 5))
+                    # Nudge scroll up then back down to trigger lazy loading
+                    page.evaluate("window.scrollBy(0, -300)")
+                    time.sleep(random.uniform(0.5, 1))
+                    page.evaluate("window.scrollTo(0, document.body.scrollHeight)")
+                    time.sleep(random.uniform(1.5, 2.5))
+                    # Check if new videos loaded
+                    cur_count = len(page.query_selector_all('a[href*="/video/"]'))
+                    print(f"   📜  Scroll {i + 1}/{scroll_count} ({cur_count} links)")
+                    if cur_count <= prev_count:
+                        stale_scrolls += 1
+                        if stale_scrolls >= 4:
+                            print(f"   ⏹  No new videos loading, stopping early")
+                            break
+                    else:
                         stale_scrolls = 0
-                        for i in range(min(scroll_count, 5)):
-                            page.evaluate("window.scrollTo(0, document.body.scrollHeight)")
-                            time.sleep(random.uniform(2, 3.5))
-                            cur_count = len(page.query_selector_all('a[href*="/video/"]'))
-                            if cur_count <= prev_count:
-                                stale_scrolls += 1
-                                if stale_scrolls >= 2:
-                                    break
-                            else:
-                                stale_scrolls = 0
-                            prev_count = cur_count
+                    prev_count = cur_count
 
-                        liked_videos = _extract_videos(page, keyword, min_views, min_likes, min_engagement_ratio, min_interactions)
-                        for vid in liked_videos:
-                            if vid["url"] not in seen_urls and new_count < max_per_keyword:
-                                seen_urls.add(vid["url"])
-                                all_results.append(vid)
-                                new_count += 1
+                # Extract video links and metadata
+                videos = _extract_videos(page, keyword, min_views, min_likes, min_engagement_ratio, min_interactions)
 
-                        if new_count > 0:
-                            print(f"   ✅  +{new_count} more from 'Most liked' tab")
-                except Exception:
-                    pass
+                new_count = 0
+                for vid in videos:
+                    if vid["url"] not in seen_urls and new_count < max_per_keyword:
+                        seen_urls.add(vid["url"])
+                        all_results.append(vid)
+                        keyword_results.append(vid)
+                        new_count += 1
+
+                print(f"   ✅  Found {new_count} videos for '{keyword}'")
+
+                # Try "Most liked" sort tab for additional results
+                if new_count < max_per_keyword:
+                    try:
+                        liked_tab = page.query_selector(
+                            'div[data-e2e="search-sort-most-liked"], '
+                            'span:has-text("Most liked"), '
+                            'div[role="tab"]:has-text("Most liked")'
+                        )
+                        if liked_tab:
+                            liked_tab.click()
+                            time.sleep(random.uniform(3, 5))
+
+                            # Scroll the "Most liked" tab
+                            prev_count = 0
+                            stale_scrolls = 0
+                            for i in range(min(scroll_count, 5)):
+                                page.evaluate("window.scrollTo(0, document.body.scrollHeight)")
+                                time.sleep(random.uniform(2, 3.5))
+                                cur_count = len(page.query_selector_all('a[href*="/video/"]'))
+                                if cur_count <= prev_count:
+                                    stale_scrolls += 1
+                                    if stale_scrolls >= 2:
+                                        break
+                                else:
+                                    stale_scrolls = 0
+                                prev_count = cur_count
+
+                            liked_videos = _extract_videos(page, keyword, min_views, min_likes, min_engagement_ratio, min_interactions)
+                            for vid in liked_videos:
+                                if vid["url"] not in seen_urls and new_count < max_per_keyword:
+                                    seen_urls.add(vid["url"])
+                                    all_results.append(vid)
+                                    keyword_results.append(vid)
+                                    new_count += 1
+
+                            if new_count > 0:
+                                print(f"   ✅  +{new_count} more from 'Most liked' tab")
+                    except Exception:
+                        pass
+
+            except Exception as e:
+                print(f"   ⚠  Error on '{keyword}': {e}")
+                print(f"   ⚠  Continuing to next keyword...")
+
+            # Callback after each keyword — save progress immediately
+            if on_keyword_done and keyword_results:
+                on_keyword_done(keyword, keyword_results)
 
         context.close()
 
