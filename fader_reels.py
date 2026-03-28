@@ -69,7 +69,9 @@ def countdown_timer(seconds: int, label: str = "Batch delay") -> None:
 
 def extract_random_thumbnail(video_path: str) -> str | None:
     """
-    Use ffmpeg to extract a frame at a random offset.
+    Extract a frame from the best part of the video and overlay $MOTION branding.
+    Picks a frame from the middle 50% of the video (where the action usually is).
+    Burns the watermark text onto the thumbnail for a consistent grid look.
     Returns path to temp .jpg or None on failure.
     """
     if not config.USE_FFMPEG_THUMBNAIL:
@@ -89,23 +91,47 @@ def extract_random_thumbnail(video_path: str) -> str | None:
         if duration < 1:
             return None
 
-        # Pick a random frame position (avoid first/last 10%)
-        offset = random.uniform(duration * 0.1, duration * 0.9)
+        # Pick from the middle 50% of the video (25%-75%) — best action frames
+        offset = random.uniform(duration * 0.25, duration * 0.75)
 
         thumb_path = os.path.join(
             tempfile.gettempdir(),
             f"fader_thumb_{uuid.uuid4().hex[:8]}.jpg",
         )
 
-        subprocess.run(
-            [config.FFMPEG_PATH,
-             "-ss", str(offset),
-             "-i", video_path,
-             "-vframes", "1",
-             "-q:v", "2",
-             "-y", thumb_path],
-            capture_output=True, timeout=15,
-        )
+        # Build filter — extract frame + overlay branding if watermark enabled
+        if config.WATERMARK_ENABLED:
+            text = config.WATERMARK_TEXT.replace("'", "'\\''").replace(":", "\\:")
+            fontsize = config.WATERMARK_FONTSIZE
+            color = config.WATERMARK_COLOR
+            # Center the watermark on the thumbnail for grid consistency
+            vf = (
+                f"drawtext=text='{text}'"
+                f":fontsize={fontsize}"
+                f":fontcolor={color}"
+                f":x=(w-tw)/2:y=h-th-40"
+                f":borderw=3:bordercolor=black@0.6"
+            )
+            cmd = [
+                config.FFMPEG_PATH,
+                "-ss", str(offset),
+                "-i", video_path,
+                "-vframes", "1",
+                "-vf", vf,
+                "-q:v", "2",
+                "-y", thumb_path,
+            ]
+        else:
+            cmd = [
+                config.FFMPEG_PATH,
+                "-ss", str(offset),
+                "-i", video_path,
+                "-vframes", "1",
+                "-q:v", "2",
+                "-y", thumb_path,
+            ]
+
+        subprocess.run(cmd, capture_output=True, timeout=15)
 
         if os.path.exists(thumb_path) and os.path.getsize(thumb_path) > 0:
             return thumb_path

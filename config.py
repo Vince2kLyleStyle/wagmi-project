@@ -81,7 +81,7 @@ THROTTLE_SLEEP_MIN = 1800    # 30 min
 THROTTLE_SLEEP_MAX = 7200    # 120 min
 
 # ─── Thumbnail ─────────────────────────────────────────────────────
-USE_FFMPEG_THUMBNAIL = False
+USE_FFMPEG_THUMBNAIL = True
 FFMPEG_PATH = "ffmpeg"
 
 # ─── Logging ────────────────────────────────────────────────────────
