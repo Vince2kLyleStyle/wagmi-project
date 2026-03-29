@@ -393,6 +393,20 @@ def log_success(filename: str, media_id: str) -> None:
         f.write(line)
 
 
+# ─── Duplicate Check ──────────────────────────────────────────────
+
+def load_posted_filenames() -> set:
+    """Load filenames already posted from success.txt."""
+    posted = set()
+    if os.path.exists(config.SUCCESS_LOG):
+        with open(config.SUCCESS_LOG, "r", encoding="utf-8") as f:
+            for line in f:
+                parts = line.strip().split(" | ")
+                if len(parts) >= 2:
+                    posted.add(parts[1].strip())
+    return posted
+
+
 # ─── Gaussian Jitter Delay ─────────────────────────────────────────
 
 def gaussian_delay(center: float, spread: float,
@@ -492,10 +506,29 @@ def get_video_queue() -> list[str]:
         print(f"[!!] No videos passed filters in {config.VIDEO_DIR}")
         sys.exit(1)
 
-    # Shuffle so we don't post in the same order every restart
-    random.shuffle(videos)
+    # Remove any videos that were already posted (check success.txt)
+    posted = load_posted_filenames()
+    already_posted = []
+    clean_videos = []
+    for vpath in videos:
+        fname = os.path.basename(vpath)
+        if fname in posted:
+            already_posted.append(fname)
+            os.remove(vpath)
+        else:
+            clean_videos.append(vpath)
 
-    return videos
+    if already_posted:
+        print(f"  [--] Removed {len(already_posted)} already-posted duplicates\n")
+
+    if not clean_videos:
+        print(f"[!!] No unposted videos in {config.VIDEO_DIR}")
+        sys.exit(1)
+
+    # Shuffle so we don't post in the same order every restart
+    random.shuffle(clean_videos)
+
+    return clean_videos
 
 
 def main() -> None:
