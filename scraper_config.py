@@ -27,43 +27,50 @@ NICHES = {
         "perfectly cut screams", "unexpected ending",
     ],
     "motion": [
-        # ── Sigma / villain arc / grindset ─────────────────────────
+        # ── Sigma / villain arc ─────────────────────────────────────
         "sigma funny", "sigma meme", "sigma male funny tiktok",
-        "sigma shitpost", "sigma rule meme", "sigma grindset",
+        "sigma shitpost", "sigma rule meme",
         "villain arc funny", "villain arc meme",
         "gigachad funny", "gigachad meme",
-        "grindset", "hustle culture funny",
-        "npc funny", "npc tiktok",
+        "hustle culture funny", "alpha male funny", "alpha male meme",
+        # ── Aura / rizz (currently massive) ────────────────────────
+        "aura meme", "aura funny", "he has aura", "aura tiktok",
+        "rizz funny", "rizz meme", "rizz lord", "unspoken rizz",
+        "looksmaxxing funny", "looksmaxxing meme",
+        # ── Grindset / self improvement comedy ─────────────────────
+        "entrepreneur funny", "entrepreneur meme",
+        "morning routine sigma", "5am club funny",
+        "gym motivation funny", "sigma gym", "gym sigma",
+        "self improvement funny", "hustle meme",
+        # ── Andrew Tate ─────────────────────────────────────────────
+        "andrew tate funny", "andrew tate meme",
         # ── Money ───────────────────────────────────────────────────
         "pov you rich", "pov bag secured", "pov you just got paid",
-        "broke vs rich", "broke to rich funny",
+        "broke vs rich", "broke to rich",
         "when the bag hits", "when the check clears",
-        "money motivation", "rich mindset", "rich lifestyle funny",
-        "flexing money", "counting money", "money flex",
-        "new money", "old money aesthetic",
-        "hood rich", "first paycheck",
+        "rich lifestyle funny", "flexing money", "counting money",
+        "first paycheck", "drip check funny",
         "passive income funny", "passive income meme",
         "stock market funny", "crypto funny", "investing funny",
         "lamborghini funny", "ferrari funny", "luxury lifestyle funny",
-        "yacht funny", "private jet funny",
-        "rich people problems funny", "billionaire meme",
+        "yacht funny", "billionaire meme",
         # ── POV — motion character POVs ────────────────────────────
         "pov sigma", "pov villain arc", "pov you're the main character",
         "pov breaking bad", "pov walter white", "pov patrick bateman",
         "pov thomas shelby", "pov jordan belfort", "pov tony montana",
         "pov joker", "pov john wick", "pov harvey specter",
         "pov you got money", "pov rich", "pov boss",
-        # ── Me when / bro thinks ────────────────────────────────────
-        "me when sigma", "me when money", "me when i get paid",
+        # ── Bro thinks / when bro ───────────────────────────────────
         "bro thinks hes patrick bateman", "bro thinks hes thomas shelby",
         "bro thinks hes walter white", "bro thinks hes jordan belfort",
         "that one friend who thinks hes sigma",
         "when bro activates villain arc", "when the quiet kid",
-        # ── Brainrot (funny overexposure of motion characters) ──────
+        # ── Brainrot ────────────────────────────────────────────────
         "breaking bad brainrot", "walter white brainrot",
         "sigma brainrot", "patrick bateman brainrot",
         "peaky blinders brainrot", "wolf of wall street brainrot",
         "joker brainrot", "american psycho brainrot",
+        "subway surfers breaking bad", "minecraft walter white",
         # ── Breaking Bad / Better Call Saul ────────────────────────
         "walter white funny", "walter white meme", "walter white edit",
         "walter white im the one who knocks", "walter white i am the danger",
@@ -75,8 +82,7 @@ NICHES = {
         "gus fring acceptable", "gus fring last walk",
         "saul goodman funny", "saul goodman meme", "saul goodman 3d",
         "better call saul funny", "better call saul meme",
-        "mike ehrmantraut funny",
-        "hank schrader funny",
+        "mike ehrmantraut funny", "hank schrader funny",
         "breaking bad funny", "breaking bad meme",
         "breaking bad funny moments", "breaking bad edit",
         "breaking bad compilation funny", "breaking bad best moments",
@@ -102,17 +108,16 @@ NICHES = {
         # ── Scarface ────────────────────────────────────────────────
         "scarface funny", "scarface meme",
         "tony montana say hello", "tony montana the world is yours",
-        # ── Fight Club (currently viral) ────────────────────────────
+        # ── Fight Club ──────────────────────────────────────────────
         "fight club funny", "fight club meme", "fight club edit",
-        "tyler durden funny", "tyler durden edit",
-        "fight club tiktok", "fight club brainrot",
+        "tyler durden funny", "tyler durden edit", "fight club brainrot",
         # ── Joker ───────────────────────────────────────────────────
         "joker funny", "joker meme", "joker stairs dance",
         "joker we live in a society",
         # ── Sopranos ────────────────────────────────────────────────
         "sopranos funny", "sopranos meme",
         "tony soprano funny", "tony soprano meme",
-        # ── Other motion universe shows/films ───────────────────────
+        # ── Other motion universe ────────────────────────────────────
         "goodfellas funny", "goodfellas meme",
         "godfather funny", "godfather meme",
         "suits funny", "suits meme", "harvey specter funny",
@@ -124,8 +129,7 @@ NICHES = {
         "the wire funny", "the wire meme",
         "game of thrones funny", "game of thrones meme",
         "prison break funny", "prison break meme",
-        "power funny", "top boy funny",
-        # ── Movie/edit formats that hit ─────────────────────────────
+        # ── Edit formats ────────────────────────────────────────────
         "coldest movie scene", "hardest movie scene",
         "most badass movie scene", "movie villain edit",
         "phonk movie edit", "movie scene phonk",
