@@ -294,14 +294,28 @@ async def send_urls_to_bot(urls, bot_username=None):
         await client.disconnect()
 
 
+def _run_coroutine(coro):
+    """Run a coroutine safely regardless of whether an event loop is running."""
+    try:
+        asyncio.get_running_loop()
+        # An event loop is already running — run in a new thread to avoid conflict
+        import concurrent.futures
+        with concurrent.futures.ThreadPoolExecutor(max_workers=1) as pool:
+            future = pool.submit(asyncio.run, coro)
+            return future.result()
+    except RuntimeError:
+        # No running loop — safe to call asyncio.run() directly
+        return asyncio.run(coro)
+
+
 def send_urls_sync(urls, bot_username=None):
     """Synchronous wrapper for send_urls_to_bot."""
-    return asyncio.run(send_urls_to_bot(urls, bot_username))
+    return _run_coroutine(send_urls_to_bot(urls, bot_username))
 
 
 def send_and_download_sync(urls, bot_username=None, download_dir=None):
     """Synchronous wrapper for send_and_download."""
-    return asyncio.run(send_and_download(urls, bot_username, download_dir))
+    return _run_coroutine(send_and_download(urls, bot_username, download_dir))
 
 
 if __name__ == "__main__":
