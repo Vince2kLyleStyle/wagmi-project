@@ -93,7 +93,7 @@ MAX_VIDEO_DURATION = 60
 
 # ─── Video Quality Filter ────────────────────────────────────────────
 # Auto-delete videos below this resolution (height in pixels). 0 = no limit.
-MIN_VIDEO_HEIGHT = 720
+MIN_VIDEO_HEIGHT = 0
 
 # ─── Logging ────────────────────────────────────────────────────────
 SUCCESS_LOG = os.path.join(os.path.dirname(__file__), "success.txt")
