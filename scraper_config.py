@@ -144,7 +144,7 @@ NICHES = {
     ],
 }
 MAX_VIDEOS_PER_KEYWORD = 50            # Videos to collect per keyword
-MIN_VIEWS = 100_000                    # Minimum view count (100k = solid traction)
+MIN_VIEWS = 200_000                    # Minimum view count (200k = viral worthy)
 MIN_LIKES = 0                          # Minimum like count (0 = no filter)
 MIN_ENGAGEMENT_RATIO = 0.02            # Min likes/views ratio (2% = realistic TikTok avg)
 SCROLL_COUNT = 10                      # Times to scroll for more results
