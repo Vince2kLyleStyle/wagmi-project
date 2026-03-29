@@ -492,6 +492,9 @@ def get_video_queue() -> list[str]:
         print(f"[!!] No videos passed filters in {config.VIDEO_DIR}")
         sys.exit(1)
 
+    # Shuffle so we don't post in the same order every restart
+    random.shuffle(videos)
+
     return videos
 
 

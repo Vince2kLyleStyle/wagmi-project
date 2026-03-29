@@ -89,7 +89,7 @@ FFMPEG_PATH = "ffmpeg"
 
 # ─── Video Duration Filter ───────────────────────────────────────────
 # Auto-delete videos longer than this (seconds). 0 = no limit.
-MAX_VIDEO_DURATION = 20
+MAX_VIDEO_DURATION = 60
 
 # ─── Video Quality Filter ────────────────────────────────────────────
 # Auto-delete videos below this resolution (height in pixels). 0 = no limit.
