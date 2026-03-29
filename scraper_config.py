@@ -115,8 +115,17 @@ NICHES = {
         "scarface funny", "scarface meme", "tony montana funny",
         "american psycho funny", "patrick bateman meme", "patrick bateman funny",
         "peaky blinders funny", "thomas shelby funny", "thomas shelby meme",
-        "breaking bad funny", "walter white meme", "walter white funny",
-        "heisenberg meme", "heisenberg funny",
+        "breaking bad funny", "breaking bad meme", "breaking bad funny moments",
+        "breaking bad best scenes", "breaking bad edit funny",
+        "walter white meme", "walter white funny", "walter white best moments",
+        "jesse pinkman funny", "jesse pinkman meme", "jesse pinkman best moments",
+        "jesse pinkman edit", "jesse pinkman bitch",
+        "walter white jesse pinkman funny", "breaking bad brainrot",
+        "heisenberg meme", "heisenberg funny", "heisenberg edit",
+        "gus fring meme", "gus fring funny", "gus fring edit",
+        "saul goodman funny", "saul goodman meme", "better call saul funny",
+        "mike ehrmantraut funny", "hank schrader funny",
+        "breaking bad tiktok", "breaking bad compilation",
         "godfather funny", "godfather meme",
         "goodfellas funny", "goodfellas meme",
         "fight club funny", "tyler durden meme", "tyler durden funny",
@@ -165,6 +174,13 @@ NICHES = {
         "drive movie edit", "blade runner edit",
         "casino edit", "departed edit",
         "gangster movie edit", "mafia edit",
+
+        # ── Quality edits that go hard (not boring motivation) ──
+        "coldest movie scene ever", "hardest movie scene",
+        "most badass movie scene", "movie scene that goes hard",
+        "iconic movie scene edit", "movie villain edit",
+        "best movie edit tiktok", "movie edit compilation",
+        "cold movie moment", "movie scene phonk",
 
         # ── Viral edit formats (short, punchy) ──
         "phonk edit", "phonk edit funny",
