@@ -142,50 +142,111 @@ NICHES = {
         # ── Specific iconic MOMENTS that became memes ──
         "patrick bateman business card", "patrick bateman walking",
         "patrick bateman morning routine", "patrick bateman axe",
-        "walter white i am the danger", "jesse pinkman bitch",
-        "jesse pinkman yo mr white", "walter white pizza",
-        "jordan belfort chest pound", "jordan belfort im not leaving",
+        "patrick bateman lets see paul allens card",
         "thomas shelby cigarette", "thomas shelby walking",
+        "thomas shelby by order of the peaky blinders",
         "tony montana say hello", "tony montana the world is yours",
-        "gus fring box cutter", "gus fring last walk",
         "joker stairs dance", "joker society", "joker we live in a society",
+        "joker you wouldnt get it", "joker hospital scene",
         "tyler durden soap", "tyler durden rules of fight club",
-        "saul goodman better call saul intro",
+        "harvey specter can opener", "harvey specter get out",
+        "gustavo fring i will kill your family",
+        "mike ehrmantraut half measures",
 
         # ═══════════════════════════════════════════════════════
-        # TIER 2: BREAKING BAD DEEP DIVE — your best performers
+        # TIER 2: BREAKING BAD MEGA DEEP DIVE
+        # Every character, every meme scene, every format
         # ═══════════════════════════════════════════════════════
+
+        # Walter White
+        "walter white funny", "walter white meme", "walter white edit",
+        "walter white transformation", "walter white heisenberg",
+        "walter white cooking", "walter white i am the danger",
+        "walter white say my name", "walter white pizza roof",
+        "walter white underwear", "walter white tighty whities",
+        "walter white laugh", "walter white crawl space",
+        "walter white you got me", "walter white stay out of my territory",
+        "walter white we need to cook", "walter white im the one who knocks",
+
+        # Jesse Pinkman
+        "jesse pinkman funny", "jesse pinkman meme", "jesse pinkman edit",
+        "jesse pinkman bitch", "jesse pinkman yo mr white",
+        "jesse pinkman science", "jesse pinkman yeah science",
+        "jesse pinkman magnets", "jesse pinkman cap",
+        "jesse pinkman crying", "jesse pinkman he cant keep getting away",
+
+        # Gus Fring
+        "gus fring funny", "gus fring meme", "gus fring edit",
+        "gus fring face off", "gus fring box cutter",
+        "gus fring last walk", "gus fring pollos hermanos",
+        "gus fring acceptable", "gus fring stare",
+
+        # Saul / Better Call Saul
+        "saul goodman funny", "saul goodman meme", "better call saul funny",
+        "saul goodman ad", "saul goodman commercial",
+        "better call saul meme", "better call saul out of context",
+        "jimmy mcgill funny", "saul goodman 3d",
+
+        # Other BB characters
+        "hank schrader funny", "hank schrader minerals",
+        "hank schrader theyre minerals marie",
+        "mike ehrmantraut funny", "mike ehrmantraut no half measures",
+        "tuco salamanca funny", "tuco tight tight tight",
+        "skinny pete funny", "badger funny", "skinny pete badger",
+
+        # Breaking Bad formats
         "breaking bad funny", "breaking bad meme", "breaking bad funny moments",
         "breaking bad tiktok", "breaking bad edit",
-        "walter white funny", "walter white meme", "walter white edit",
-        "jesse pinkman funny", "jesse pinkman meme", "jesse pinkman edit",
-        "heisenberg funny", "heisenberg meme", "heisenberg edit",
-        "gus fring funny", "gus fring meme", "gus fring edit",
-        "saul goodman funny", "saul goodman meme", "better call saul funny",
-        "hank schrader funny", "mike ehrmantraut funny",
-        "walter white jesse pinkman funny",
         "breaking bad out of context", "breaking bad shitpost",
+        "breaking bad brainrot", "breaking bad no context",
+        "breaking bad compilation funny", "breaking bad best moments",
+        "walter white jesse pinkman funny",
 
         # ═══════════════════════════════════════════════════════
-        # TIER 3: MOVIE MEMES & FUNNY EDITS — proven performers
+        # TIER 2B: WOLF OF WALL STREET DEEP DIVE
         # ═══════════════════════════════════════════════════════
         "wolf of wall street funny", "wolf of wall street meme",
-        "scarface funny", "scarface meme",
-        "american psycho funny", "american psycho meme",
-        "peaky blinders funny", "peaky blinders meme",
+        "wolf of wall street edit", "wolf of wall street tiktok",
+        "wolf of wall street out of context",
+        "wolf of wall street best scenes", "wolf of wall street funny moments",
+        "jordan belfort funny", "jordan belfort meme", "jordan belfort edit",
+        "jordan belfort chest pound", "jordan belfort im not leaving",
+        "jordan belfort quaalude", "jordan belfort crawling",
+        "jordan belfort sell me this pen", "jordan belfort speech",
+        "jordan belfort party scene", "jordan belfort yacht",
+        "jordan belfort money", "jordan belfort lambo",
+        "donnie azoff funny", "jonah hill wolf of wall street",
+        "wolf of wall street phone scene", "wolf of wall street office scene",
+        "wolf of wall street shitpost", "wolf of wall street brainrot",
+
+        # ═══════════════════════════════════════════════════════
+        # TIER 3: OTHER MOVIE MEMES (BB & WoWS covered above)
+        # ═══════════════════════════════════════════════════════
+        "scarface funny", "scarface meme", "scarface out of context",
+        "american psycho funny", "american psycho meme", "american psycho out of context",
+        "peaky blinders funny", "peaky blinders meme", "peaky blinders out of context",
         "godfather funny", "godfather meme",
-        "goodfellas funny", "goodfellas meme",
+        "goodfellas funny", "goodfellas meme", "goodfellas out of context",
         "fight club funny", "fight club meme",
         "joker funny", "joker meme",
         "john wick funny", "john wick meme",
-        "suits funny", "suits meme", "harvey specter meme",
-        "narcos funny", "narcos meme",
+        "suits funny", "suits meme", "suits out of context",
+        "narcos funny", "narcos meme", "narcos out of context",
         "money heist funny", "money heist meme",
         "top boy funny", "power funny",
-        "succession funny", "ozark funny",
+        "succession funny", "succession meme",
+        "ozark funny", "ozark meme",
         "django funny", "pulp fiction funny",
         "taxi driver meme", "nightcrawler meme",
         "drive movie meme", "blade runner meme",
+        # Bonus shows that produce great meme content
+        "sopranos funny", "sopranos meme", "sopranos out of context",
+        "tony soprano funny", "tony soprano meme",
+        "the wire funny", "the wire meme",
+        "game of thrones funny", "game of thrones meme",
+        "house of cards funny", "frank underwood meme",
+        "sherlock funny", "sherlock meme",
+        "prison break funny", "prison break meme",
 
         # ── Movie out of context / shitpost (pure gold) ──
         "movie out of context", "movie scene out of context",
