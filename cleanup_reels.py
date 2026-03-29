@@ -128,16 +128,23 @@ def get_reel_stats(media):
     }
 
 
-def should_delete(stats, min_views, min_age_hours):
+def should_delete(stats, min_views, min_age_hours, before_date=None):
     """Decide if a reel should be deleted based on performance."""
-    # Skip posts that are too new (haven't had time to get views)
     if stats["taken_at"]:
         taken = stats["taken_at"]
         if taken.tzinfo is None:
             taken = taken.replace(tzinfo=timezone.utc)
+
+        # Skip posts that are too new (haven't had time to get views)
         age = datetime.now(timezone.utc) - taken
         if age < timedelta(hours=min_age_hours):
             return False, "too_new"
+
+        # Skip posts after the before_date cutoff (keep those)
+        if before_date:
+            cutoff = datetime.strptime(before_date, "%Y-%m-%d").replace(tzinfo=timezone.utc)
+            if taken >= cutoff:
+                return False, "after_cutoff"
 
     if stats["views"] < min_views:
         return True, "low_views"
@@ -219,6 +226,10 @@ def main():
         help="Only add pinned comments, don't delete anything"
     )
     parser.add_argument(
+        "--before", type=str, default=None,
+        help="Only delete posts BEFORE this date (YYYY-MM-DD). Posts on/after this date are kept."
+    )
+    parser.add_argument(
         "--username", "-u", default=None,
         help="Override IG username"
     )
@@ -268,7 +279,7 @@ def main():
 
     for media in reels:
         stats = get_reel_stats(media)
-        should_del, reason = should_delete(stats, args.min_views, args.min_age)
+        should_del, reason = should_delete(stats, args.min_views, args.min_age, args.before)
 
         if reason == "too_new":
             too_new.append(stats)
