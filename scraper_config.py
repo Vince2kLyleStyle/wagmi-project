@@ -110,86 +110,109 @@ NICHES = {
         "ai slideshow facts", "ai facts compilation",
     ],
     "motion": [
-        # ── FUNNY movie edits (these are your bangers) ──
-        "wolf of wall street funny", "wolf of wall street meme",
-        "scarface funny", "scarface meme", "tony montana funny",
-        "american psycho funny", "patrick bateman meme", "patrick bateman funny",
-        "peaky blinders funny", "thomas shelby funny", "thomas shelby meme",
+        # ═══════════════════════════════════════════════════════
+        # TIER 1: VIRAL FORMATS — these are how funny content
+        # is actually tagged on TikTok. Search by FORMAT not just
+        # movie name. These pull the short punchy clips.
+        # ═══════════════════════════════════════════════════════
+
+        # ── "POV" format (relatable movie clips) ──
+        "pov sigma", "pov villain arc", "pov you're the main character",
+        "pov breaking bad", "pov walter white", "pov patrick bateman",
+        "pov thomas shelby", "pov jordan belfort", "pov tony montana",
+        "pov joker", "pov john wick", "pov harvey specter",
+        "pov you got money", "pov rich", "pov boss",
+
+        # ── "Me when" / "bro thinks he's" format (meme clips) ──
+        "me when sigma", "me when money", "me when i get paid",
+        "bro thinks hes patrick bateman", "bro thinks hes thomas shelby",
+        "bro thinks hes walter white", "bro thinks hes the joker",
+        "bro thinks hes jordan belfort", "bro thinks hes tony montana",
+        "that one friend who thinks hes sigma",
+        "when the quiet kid", "when bro activates villain arc",
+
+        # ── Brainrot / unhinged (the funniest content) ──
+        "breaking bad brainrot", "sigma brainrot",
+        "movie brainrot", "cinema brainrot",
+        "patrick bateman brainrot", "walter white brainrot",
+        "peaky blinders brainrot", "joker brainrot",
+        "american psycho brainrot", "scarface brainrot",
+        "wolf of wall street brainrot",
+
+        # ── Specific iconic MOMENTS that became memes ──
+        "patrick bateman business card", "patrick bateman walking",
+        "patrick bateman morning routine", "patrick bateman axe",
+        "walter white i am the danger", "jesse pinkman bitch",
+        "jesse pinkman yo mr white", "walter white pizza",
+        "jordan belfort chest pound", "jordan belfort im not leaving",
+        "thomas shelby cigarette", "thomas shelby walking",
+        "tony montana say hello", "tony montana the world is yours",
+        "gus fring box cutter", "gus fring last walk",
+        "joker stairs dance", "joker society", "joker we live in a society",
+        "tyler durden soap", "tyler durden rules of fight club",
+        "saul goodman better call saul intro",
+
+        # ═══════════════════════════════════════════════════════
+        # TIER 2: BREAKING BAD DEEP DIVE — your best performers
+        # ═══════════════════════════════════════════════════════
         "breaking bad funny", "breaking bad meme", "breaking bad funny moments",
-        "breaking bad best scenes", "breaking bad edit funny",
-        "walter white meme", "walter white funny", "walter white best moments",
-        "jesse pinkman funny", "jesse pinkman meme", "jesse pinkman best moments",
-        "jesse pinkman edit", "jesse pinkman bitch",
-        "walter white jesse pinkman funny", "breaking bad brainrot",
-        "heisenberg meme", "heisenberg funny", "heisenberg edit",
-        "gus fring meme", "gus fring funny", "gus fring edit",
+        "breaking bad tiktok", "breaking bad edit",
+        "walter white funny", "walter white meme", "walter white edit",
+        "jesse pinkman funny", "jesse pinkman meme", "jesse pinkman edit",
+        "heisenberg funny", "heisenberg meme", "heisenberg edit",
+        "gus fring funny", "gus fring meme", "gus fring edit",
         "saul goodman funny", "saul goodman meme", "better call saul funny",
-        "mike ehrmantraut funny", "hank schrader funny",
-        "breaking bad tiktok", "breaking bad compilation",
+        "hank schrader funny", "mike ehrmantraut funny",
+        "walter white jesse pinkman funny",
+        "breaking bad out of context", "breaking bad shitpost",
+
+        # ═══════════════════════════════════════════════════════
+        # TIER 3: MOVIE MEMES & FUNNY EDITS — proven performers
+        # ═══════════════════════════════════════════════════════
+        "wolf of wall street funny", "wolf of wall street meme",
+        "scarface funny", "scarface meme",
+        "american psycho funny", "american psycho meme",
+        "peaky blinders funny", "peaky blinders meme",
         "godfather funny", "godfather meme",
         "goodfellas funny", "goodfellas meme",
-        "fight club funny", "tyler durden meme", "tyler durden funny",
-        "joker funny", "joker meme", "joker funny scene",
-        "batman funny", "batman meme",
+        "fight club funny", "fight club meme",
+        "joker funny", "joker meme",
         "john wick funny", "john wick meme",
-        "suits funny", "harvey specter funny", "harvey specter meme",
-        "money heist funny", "professor funny",
+        "suits funny", "suits meme", "harvey specter meme",
         "narcos funny", "narcos meme",
+        "money heist funny", "money heist meme",
+        "top boy funny", "power funny",
+        "succession funny", "ozark funny",
         "django funny", "pulp fiction funny",
         "taxi driver meme", "nightcrawler meme",
-        "ozark funny", "power funny",
-        "top boy funny", "top boy meme",
-        "succession funny", "logan roy meme",
+        "drive movie meme", "blade runner meme",
 
-        # ── Sigma / grindset MEMES (funny ones, not serious) ──
+        # ── Movie out of context / shitpost (pure gold) ──
+        "movie out of context", "movie scene out of context",
+        "film out of context", "cinema out of context",
+        "movie shitpost", "film shitpost",
+        "movie scene no context", "best movie meme",
+
+        # ── Sigma / gigachad MEMES (funny only) ──
         "sigma meme", "sigma male meme", "sigma funny",
-        "sigma rule funny", "sigma male funny",
-        "gigachad meme", "gigachad funny",
-        "sigma edit funny", "sigma brainrot",
+        "sigma rule meme", "gigachad meme", "gigachad funny",
         "villain arc meme", "villain arc funny",
-        "lone wolf meme",
-
-        # ── Money MEMES (funny, not motivational speeches) ──
-        "money meme", "money meme funny", "money meme edit",
-        "counting money meme", "money flex funny",
-        "rich people funny", "rich meme",
-        "hood money meme", "hood funny money",
-        "gangster meme", "gangster funny",
-        "mafia meme", "mafia funny",
-        "bag secured meme", "money printer meme",
         "grindset meme", "hustle meme",
+        "sigma male funny tiktok", "sigma shitpost",
 
-        # ── Movie edits (cold/hard, not boring motivation) ──
-        "wolf of wall street edit", "scarface edit",
-        "american psycho edit", "peaky blinders edit",
-        "breaking bad edit", "godfather edit",
-        "goodfellas edit", "fight club edit",
-        "joker edit", "batman edit", "dark knight edit",
-        "john wick edit", "suits edit",
-        "money heist edit", "narcos edit",
-        "django unchained edit", "pulp fiction edit",
-        "taxi driver edit", "nightcrawler edit",
-        "top boy edit", "power edit",
-        "succession edit", "ozark edit",
-        "drive movie edit", "blade runner edit",
-        "casino edit", "departed edit",
-        "gangster movie edit", "mafia edit",
+        # ── Money memes (funny, not guru content) ──
+        "money meme", "money meme funny",
+        "counting money meme", "money flex funny",
+        "rich people funny", "hood money meme",
+        "gangster meme", "mafia meme",
+        "money printer meme", "bag secured meme",
 
-        # ── Quality edits that go hard (not boring motivation) ──
-        "coldest movie scene ever", "hardest movie scene",
-        "most badass movie scene", "movie scene that goes hard",
-        "iconic movie scene edit", "movie villain edit",
-        "best movie edit tiktok", "movie edit compilation",
-        "cold movie moment", "movie scene phonk",
-
-        # ── Viral edit formats (short, punchy) ──
-        "phonk edit", "phonk edit funny",
-        "hard edit", "edit that goes hard",
-        "this edit goes crazy", "cold edit",
-        "movie scene meme", "funny movie edit",
-        "funny villain edit", "funny movie scene",
-        "movie meme compilation", "cinema meme",
-        "film meme edit", "movie edit viral",
+        # ── Phonk / cold edits (short bangers) ──
+        "phonk edit", "phonk movie edit",
+        "coldest movie scene", "hardest movie scene",
+        "movie scene phonk", "cold edit",
+        "edit that goes hard", "this edit goes crazy",
+        "most badass movie scene", "movie villain edit",
     ],
 }
 
@@ -200,39 +223,44 @@ CAPTION_MATCH_THRESHOLD = 0.35
 # ─── Bulk Mode: Multiple Viral Captions ──────────────────────────────
 # Search these captions to find motion/grindset accounts and videos.
 VIRAL_CAPTIONS = [
-    # ── Funny movie edit captions (these find the right accounts) ──
+    # ── POV / relatable format (finds meme accounts) ──
+    "pov you just activated your villain arc",
+    "bro thinks hes patrick bateman",
+    "bro thinks hes thomas shelby",
+    "when the quiet kid starts quoting walter white",
+    "me when i get my paycheck",
+    "that one friend who watches too many gangster movies",
+
+    # ── Out of context / shitpost (finds funny accounts) ──
+    "breaking bad out of context",
+    "movie scenes out of context",
+    "this scene is unhinged",
+    "no context just cinema",
+    "how did this get approved",
+
+    # ── Specific moment memes (finds clip accounts) ──
+    "patrick bateman business card scene will never get old",
+    "jesse pinkman is the funniest character ever",
+    "walter white pizza scene",
+    "jordan belfort chest thump",
+    "gus fring was actually terrifying",
+    "saul goodman is comedy gold",
+
+    # ── Edit appreciation (finds edit pages) ──
     "this edit goes hard",
-    "wolf of wall street will never get old",
-    "patrick bateman is actually insane",
-    "thomas shelby funny moments",
-    "walter white was actually unhinged",
-    "jordan belfort was actually crazy",
-    "scarface tony montana best scenes",
-    "the joker was right about everything",
-    "harvey specter best moments",
-    "peaky blinders best scenes",
-
-    # ── Sigma / meme edit captions ──
-    "sigma male edit that goes hard",
-    "he was built different",
-    "bro activated his villain arc",
-    "villain arc activated",
-    "this sigma edit is insane",
-    "gigachad energy",
-    "most cold blooded movie scene",
-    "coldest movie moment",
-
-    # ── Funny / viral format captions ──
-    "this edit is insane",
-    "hardest edit on tiktok",
-    "phonk edits hit different at night",
     "nah this edit goes crazy",
-    "im dead this is too accurate",
-    "the way this edit hits",
-    "bro this scene was actually cold",
-    "who made this edit im crying",
-    "funniest movie scene edit",
+    "hardest edit on tiktok",
+    "who made this edit",
+    "the way this edit hits different",
+    "phonk edits at 3am hit different",
+    "coldest movie scene ever edited",
     "movie memes that hit different",
+
+    # ── Brainrot / unhinged ──
+    "breaking bad brainrot",
+    "cinema brainrot",
+    "sigma brainrot is taking over",
+    "this is peak cinema",
 ]
 
 # ─── Niche Relevance Filter ──────────────────────────────────────────
@@ -326,10 +354,10 @@ NICHE_REQUIRED_TERMS = {
 # Max videos to grab per discovered account
 MAX_VIDEOS_PER_ACCOUNT = 30
 MAX_VIDEOS_PER_KEYWORD = 200            # Videos to collect per keyword
-MIN_VIEWS = 50_000                     # Higher bar — motion niche has tons of viral content
-MIN_LIKES = 1_000                      # Minimum like count — filters out dead content
-MIN_ENGAGEMENT_RATIO = 0.04            # Min likes/views ratio (4% = funny content gets higher engagement)
-MIN_INTERACTIONS = 30_000              # Minimum total interactions — funny clips get shared heavily
+MIN_VIEWS = 25_000                     # Catch good newer content that hasn't blown up yet
+MIN_LIKES = 500                        # Must have some engagement
+MIN_ENGAGEMENT_RATIO = 0.04            # 4% engagement — funny content gets liked more
+MIN_INTERACTIONS = 5_000               # Lower bar — good memes sometimes have fewer shares
 SCROLL_COUNT = 40                      # More scrolling = more videos found
 HEADLESS = True                        # Run browser without GUI
 
