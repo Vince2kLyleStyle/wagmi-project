@@ -28,6 +28,21 @@ BANNER = """
 """
 
 
+def load_completed_keywords(niche_name):
+    """Load set of already-completed keywords for a niche (for resume support)."""
+    path = os.path.join(os.path.dirname(cfg.OUTPUT_FILE) or ".", f"{niche_name}_progress.txt")
+    if not os.path.exists(path):
+        return set(), path
+    with open(path) as f:
+        return {line.strip() for line in f if line.strip()}, path
+
+
+def mark_keyword_done(progress_path, keyword):
+    """Append a completed keyword to the progress file."""
+    with open(progress_path, "a") as f:
+        f.write(keyword + "\n")
+
+
 def load_existing_urls(filepath):
     """Load previously scraped URLs to avoid duplicates."""
     if not os.path.exists(filepath):
@@ -57,51 +72,45 @@ def run_niche(niche_name, keywords, args, existing_urls):
     """Scrape + download for a single niche. Returns count of new videos."""
     download_dir = os.path.join(cfg.DOWNLOAD_DIR, niche_name)
 
+    # Resume support — skip already-completed keywords
+    completed, progress_path = load_completed_keywords(niche_name)
+    remaining = [k for k in keywords if k not in completed]
+    if completed:
+        print(f"\n  ⏭  Resuming — skipping {len(completed)} already-done keywords, {len(remaining)} remaining")
+    if not remaining:
+        print(f"  ✅  All keywords already scraped for '{niche_name}'. Delete {niche_name}_progress.txt to re-scrape.")
+        return 0
+
     print(f"\n{'═' * 54}")
     print(f"  NICHE: {niche_name}")
-    print(f"  Keywords: {', '.join(keywords)}")
+    print(f"  Keywords: {', '.join(remaining)}")
     print(f"  Download: {download_dir}")
     print(f"{'═' * 54}")
 
-    results = scrape_tiktok(
-        keywords=keywords,
-        max_per_keyword=args.max,
-        min_views=args.min_views,
-        min_likes=args.min_likes,
-        scroll_count=args.scrolls,
-        headless=not args.no_headless,
-        min_engagement_ratio=args.min_engagement,
-    )
+    total_new = [0]  # use list for mutation inside closure
 
-    if not results:
-        print(f"\n  ⚠  No videos found for '{niche_name}'")
-        return 0
+    def on_keyword_done(keyword, results):
+        new_results = [r for r in results if r["url"] not in existing_urls]
+        for r in new_results:
+            existing_urls.add(r["url"])
 
-    new_results = [r for r in results if r["url"] not in existing_urls]
-    # Add to existing set so cross-niche dedup works
-    for r in new_results:
-        existing_urls.add(r["url"])
+        mark_keyword_done(progress_path, keyword)
 
-    print(f"\n  📊  {niche_name}: {len(results)} found, {len(new_results)} new")
+        if not new_results:
+            return
 
-    if not new_results:
-        print(f"  All videos already scraped for '{niche_name}'.")
-        return 0
+        save_urls(new_results, args.output)
+        total_new[0] += len(new_results)
 
-    save_urls(new_results, args.output)
+        for r in new_results[:5]:
+            views = f"{r['views']:>10,}" if r["views"] else "   unknown"
+            ratio = f"{r['likes']/r['views']*100:.1f}%" if r.get("views") and r.get("likes") else "  n/a"
+            print(f"  {views} views | {ratio:>5} eng | {r['url']}")
+        if len(new_results) > 5:
+            print(f"  ... and {len(new_results) - 5} more")
 
-    # Print results — show engagement so you can see quality at a glance
-    for r in new_results[:10]:  # Show first 10
-        views = f"{r['views']:>10,}" if r["views"] else "   unknown"
-        ratio = f"{r['likes']/r['views']*100:.1f}%" if r.get("views") and r.get("likes") else "  n/a"
-        print(f"  {views} views | {ratio:>5} eng | {r['url']}")
-    if len(new_results) > 10:
-        print(f"  ... and {len(new_results) - 10} more")
-
-    # Download via Telegram
-    if args.no_telegram:
-        pass
-    else:
+        if args.no_telegram:
+            return
         urls = [r["url"] for r in new_results]
         if args.no_download:
             sent, failed = send_urls_sync(urls)
@@ -114,7 +123,18 @@ def run_niche(niche_name, keywords, args, existing_urls):
             if downloaded > 0:
                 print(f"  📂  Saved to: {download_dir}")
 
-    return len(new_results)
+    scrape_tiktok(
+        keywords=remaining,
+        max_per_keyword=args.max,
+        min_views=args.min_views,
+        min_likes=args.min_likes,
+        scroll_count=args.scrolls,
+        headless=not args.no_headless,
+        min_engagement_ratio=args.min_engagement,
+        on_keyword_done=on_keyword_done,
+    )
+
+    return total_new[0]
 
 
 def main():

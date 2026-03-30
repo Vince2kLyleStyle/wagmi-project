@@ -82,10 +82,12 @@ def login_to_tiktok():
 
 
 def scrape_tiktok(keywords, max_per_keyword=20, min_views=0, min_likes=0,
-                  scroll_count=5, headless=True, min_engagement_ratio=0.0):
+                  scroll_count=5, headless=True, min_engagement_ratio=0.0,
+                  on_keyword_done=None):
     """
     Scrape TikTok search results for given keywords.
 
+    on_keyword_done(keyword, results) is called after each keyword completes.
     Returns list of dicts: [{"url": str, "views": int, "keyword": str}, ...]
     """
     from playwright.sync_api import sync_playwright
@@ -151,10 +153,12 @@ def scrape_tiktok(keywords, max_per_keyword=20, min_views=0, min_likes=0,
             videos = _extract_videos(page, keyword, min_views, min_likes, min_engagement_ratio)
 
             new_count = 0
+            keyword_results = []
             for vid in videos:
                 if vid["url"] not in seen_urls and new_count < max_per_keyword:
                     seen_urls.add(vid["url"])
                     all_results.append(vid)
+                    keyword_results.append(vid)
                     new_count += 1
 
             print(f"   ✅  Found {new_count} videos for '{keyword}'")
@@ -191,12 +195,16 @@ def scrape_tiktok(keywords, max_per_keyword=20, min_views=0, min_likes=0,
                             if vid["url"] not in seen_urls and new_count < max_per_keyword:
                                 seen_urls.add(vid["url"])
                                 all_results.append(vid)
+                                keyword_results.append(vid)
                                 new_count += 1
 
                         if new_count > 0:
                             print(f"   ✅  +{new_count} more from 'Most liked' tab")
                 except Exception:
                     pass
+
+            if on_keyword_done:
+                on_keyword_done(keyword, keyword_results)
 
         context.close()
 
