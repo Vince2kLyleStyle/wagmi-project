@@ -300,7 +300,14 @@ def upload_reel(cl: Client, video_path: str) -> str | None:
         kwargs["thumbnail"] = thumbnail
 
     try:
-        media = cl.clip_upload(**kwargs)
+        import concurrent.futures
+        with concurrent.futures.ThreadPoolExecutor(max_workers=1) as executor:
+            future = executor.submit(cl.clip_upload, **kwargs)
+            try:
+                media = future.result(timeout=300)  # 5 min max per upload
+            except concurrent.futures.TimeoutError:
+                print(f"\n  [!!] Upload timed out after 5 minutes — skipping")
+                return None
         media_pk = str(media.pk) if hasattr(media, "pk") else str(media)
         media_full_id = media.id if hasattr(media, "id") else media_pk
 
