@@ -67,16 +67,37 @@ def countdown_timer(seconds: int, label: str = "Batch delay") -> None:
 
 # ─── Thumbnail Extraction ──────────────────────────────────────────
 
-def extract_random_thumbnail(video_path: str) -> str | None:
+def generate_branded_thumbnail(video_path: str = "") -> str | None:
     """
-    Use ffmpeg to extract a frame at a random offset.
+    Thumbnail priority:
+    1. If thumbnail.jpg exists in project folder → use that (e.g. Wolf of Wall Street girl)
+    2. Otherwise → extract a frame from the video itself
+
     Returns path to temp .jpg or None on failure.
     """
     if not config.USE_FFMPEG_THUMBNAIL:
         return None
 
     try:
-        # Get video duration via ffprobe
+        import shutil
+
+        # Priority 1: Custom thumbnail.jpg
+        project_dir = os.path.dirname(os.path.abspath(__file__))
+        thumb_src = os.path.join(project_dir, "thumbnail.jpg")
+
+        if os.path.exists(thumb_src):
+            thumb_path = os.path.join(
+                tempfile.gettempdir(),
+                f"fader_thumb_{uuid.uuid4().hex[:8]}.jpg",
+            )
+            shutil.copy2(thumb_src, thumb_path)
+            if os.path.exists(thumb_path) and os.path.getsize(thumb_path) > 0:
+                return thumb_path
+
+        # Priority 2: Extract frame from video
+        if not video_path:
+            return None
+
         probe = subprocess.run(
             [config.FFMPEG_PATH.replace("ffmpeg", "ffprobe"),
              "-v", "error",
@@ -89,8 +110,8 @@ def extract_random_thumbnail(video_path: str) -> str | None:
         if duration < 1:
             return None
 
-        # Pick a random frame position (avoid first/last 10%)
-        offset = random.uniform(duration * 0.1, duration * 0.9)
+        # Pick from the middle of the video (best action frames)
+        offset = random.uniform(duration * 0.25, duration * 0.75)
 
         thumb_path = os.path.join(
             tempfile.gettempdir(),
@@ -103,14 +124,18 @@ def extract_random_thumbnail(video_path: str) -> str | None:
              "-i", video_path,
              "-vframes", "1",
              "-q:v", "2",
+             "-update", "1",
              "-y", thumb_path],
             capture_output=True, timeout=15,
         )
 
         if os.path.exists(thumb_path) and os.path.getsize(thumb_path) > 0:
             return thumb_path
+
     except Exception as e:
-        print(f"  [thumbnail] ffmpeg error (non-fatal): {e}")
+        print(f"  [thumbnail] Error (non-fatal): {e}")
+
+    return None
 
     return None
 
@@ -180,21 +205,135 @@ def relogin_client(cl: Client, session_file: str) -> Client:
     return cl
 
 
+# ─── Watermark Overlay ────────────────────────────────────────────
+
+def apply_watermark(video_path: str) -> str | None:
+    """
+    Burn a text watermark onto the video using ffmpeg.
+    Returns path to the watermarked temp file, or None on failure.
+    Original file is NOT modified.
+    """
+    if not config.WATERMARK_ENABLED:
+        return None
+
+    text = config.WATERMARK_TEXT
+    fontsize = config.WATERMARK_FONTSIZE
+    opacity = config.WATERMARK_OPACITY
+    color = config.WATERMARK_COLOR
+    position = config.WATERMARK_POSITION
+    font_file = config.WATERMARK_FONT
+
+    # Map position to ffmpeg drawtext x:y expressions
+    # Add padding from edges
+    pad = 20
+    pos_map = {
+        "top_left":     f"x={pad}:y={pad}",
+        "top_right":    f"x=w-tw-{pad}:y={pad}",
+        "bottom_left":  f"x={pad}:y=h-th-{pad}",
+        "bottom_right": f"x=w-tw-{pad}:y=h-th-{pad}",
+        "center":       f"x=(w-tw)/2:y=(h-th)/2",
+    }
+    xy = pos_map.get(position, pos_map["bottom_right"])
+
+    # Build drawtext filter
+    # Escape special characters for ffmpeg
+    escaped_text = text.replace("'", "'\\''").replace(":", "\\:")
+    font_arg = f":fontfile='{font_file}'" if font_file else ""
+    alpha = f":alpha={opacity}" if opacity < 1.0 else ""
+
+    drawtext = (
+        f"drawtext=text='{escaped_text}'"
+        f":fontsize={fontsize}"
+        f":fontcolor={color}{alpha}"
+        f":{xy}"
+        f"{font_arg}"
+        f":borderw=2:bordercolor=black@0.5"
+    )
+
+    # Output to temp file
+    out_path = os.path.join(
+        tempfile.gettempdir(),
+        f"fader_wm_{uuid.uuid4().hex[:8]}.mp4",
+    )
+
+    try:
+        result = subprocess.run(
+            [config.FFMPEG_PATH,
+             "-i", video_path,
+             "-vf", drawtext,
+             "-codec:a", "copy",
+             "-y", out_path],
+            capture_output=True, text=True, timeout=120,
+        )
+        if result.returncode != 0:
+            print(f"  [watermark] ffmpeg error: {result.stderr[:200]}")
+            return None
+
+        if os.path.exists(out_path) and os.path.getsize(out_path) > 0:
+            return out_path
+
+    except Exception as e:
+        print(f"  [watermark] Error (non-fatal): {e}")
+
+    return None
+
+
+# ─── Pinned Comment ───────────────────────────────────────────────
+
+def pin_comment_on_reel(cl: Client, media_id: str, media_pk: str = "") -> bool:
+    """Post a comment and pin it on the uploaded reel."""
+    if not config.PIN_COMMENT_ENABLED:
+        return False
+
+    comment_text = random.choice(config.PIN_COMMENTS)
+    try:
+        # Post the comment
+        comment = cl.media_comment(media_id, comment_text)
+        comment_pk = comment.pk
+        time.sleep(random.uniform(2, 5))
+
+        # Pin using media_pk (numeric ID) — Instagram's pin endpoint needs this
+        pin_id = media_pk or media_id
+        try:
+            cl.comment_pin(pin_id, comment_pk)
+            print(f"  [pin] Pinned: \"{comment_text}\"")
+        except Exception as pin_err:
+            # If pin fails, try with the other ID format
+            alt_id = media_id if pin_id == media_pk else media_pk
+            if alt_id and alt_id != pin_id:
+                try:
+                    cl.comment_pin(alt_id, comment_pk)
+                    print(f"  [pin] Pinned (alt): \"{comment_text}\"")
+                except Exception:
+                    print(f"  [pin] Comment posted but pin failed: {pin_err}")
+            else:
+                print(f"  [pin] Comment posted but pin failed: {pin_err}")
+        return True
+    except Exception as e:
+        print(f"  [pin] Comment/pin error (non-fatal): {e}")
+        return False
+
+
 # ─── Upload Logic ──────────────────────────────────────────────────
 
 def upload_reel(cl: Client, video_path: str) -> str | None:
     """
     Upload a single Reel. Returns the media ID on success, None on failure.
+    Applies watermark if enabled, pins comment after upload.
     """
     # Pick from the 3 preset captions, or use the random generator
     if config.USE_SAME_CAPTION:
         caption = random.choice(config.VIRAL_CAPTIONS)
     else:
         caption = captions.generate_caption()
-    thumbnail = extract_random_thumbnail(video_path)
+    thumbnail = generate_branded_thumbnail(video_path)
+
+    # Apply watermark overlay
+    watermarked = apply_watermark(video_path)
+    upload_path = watermarked or video_path
 
     kwargs = {
-        "path":    video_path,
+        "path":    upload_path,
         "caption": caption,
     }
     if thumbnail:
@@ -202,13 +341,20 @@ def upload_reel(cl: Client, video_path: str) -> str | None:
 
     try:
         media = cl.clip_upload(**kwargs)
-        media_id = media.pk if hasattr(media, "pk") else str(media)
+        media_pk = str(media.pk) if hasattr(media, "pk") else str(media)
+        media_full_id = media.id if hasattr(media, "id") else media_pk
 
-        # Clean up temp thumbnail
+        # Clean up temp files
         if thumbnail and os.path.exists(thumbnail):
             os.remove(thumbnail)
+        if watermarked and os.path.exists(watermarked):
+            os.remove(watermarked)
 
-        return str(media_id)
+        # Pin comment on the new reel
+        time.sleep(random.uniform(2, 5))
+        pin_comment_on_reel(cl, media_full_id, media_pk=media_pk)
+
+        return str(media_pk)
 
     except (PleaseWaitFewMinutes, RateLimitError) as e:
         print(f"\n  [!!] Rate limited: {e}")
@@ -232,6 +378,11 @@ def upload_reel(cl: Client, video_path: str) -> str | None:
                 os.remove(thumbnail)
             except OSError:
                 pass
+        if watermarked and os.path.exists(watermarked):
+            try:
+                os.remove(watermarked)
+            except OSError:
+                pass
 
 
 def log_success(filename: str, media_id: str) -> None:
@@ -240,6 +391,20 @@ def log_success(filename: str, media_id: str) -> None:
     line = f"{timestamp} | {filename} | Media ID: {media_id}\n"
     with open(config.SUCCESS_LOG, "a", encoding="utf-8") as f:
         f.write(line)
+
+
+# ─── Duplicate Check ──────────────────────────────────────────────
+
+def load_posted_filenames() -> set:
+    """Load filenames already posted from success.txt."""
+    posted = set()
+    if os.path.exists(config.SUCCESS_LOG):
+        with open(config.SUCCESS_LOG, "r", encoding="utf-8") as f:
+            for line in f:
+                parts = line.strip().split(" | ")
+                if len(parts) >= 2:
+                    posted.add(parts[1].strip())
+    return posted
 
 
 # ─── Gaussian Jitter Delay ─────────────────────────────────────────
@@ -257,14 +422,113 @@ def gaussian_delay(center: float, spread: float,
 
 # ─── Main Loop ─────────────────────────────────────────────────────
 
+def get_video_duration(video_path: str) -> float:
+    """Get video duration in seconds using ffprobe."""
+    try:
+        probe = subprocess.run(
+            [config.FFMPEG_PATH.replace("ffmpeg", "ffprobe"),
+             "-v", "error",
+             "-show_entries", "format=duration",
+             "-of", "default=noprint_wrappers=1:nokey=1",
+             video_path],
+            capture_output=True, text=True, timeout=15,
+        )
+        return float(probe.stdout.strip())
+    except Exception:
+        return 0.0
+
+
+def get_video_height(video_path: str) -> int:
+    """Get video height in pixels using ffprobe."""
+    try:
+        probe = subprocess.run(
+            [config.FFMPEG_PATH.replace("ffmpeg", "ffprobe"),
+             "-v", "error",
+             "-select_streams", "v:0",
+             "-show_entries", "stream=height",
+             "-of", "default=noprint_wrappers=1:nokey=1",
+             video_path],
+            capture_output=True, text=True, timeout=15,
+        )
+        return int(probe.stdout.strip())
+    except Exception:
+        return 0
+
+
 def get_video_queue() -> list[str]:
-    """Gather all .mp4 files from the video directory, sorted by name."""
+    """Gather all .mp4 files, auto-delete long or low-quality videos."""
     pattern = os.path.join(config.VIDEO_DIR, "*.mp4")
-    videos = sorted(glob.glob(pattern))
-    if not videos:
+    all_videos = sorted(glob.glob(pattern))
+
+    if not all_videos:
         print(f"[!!] No .mp4 files found in {config.VIDEO_DIR}")
         sys.exit(1)
-    return videos
+
+    max_dur = getattr(config, "MAX_VIDEO_DURATION", 0)
+    min_height = getattr(config, "MIN_VIDEO_HEIGHT", 0)
+
+    if not max_dur and not min_height:
+        return all_videos
+
+    videos = []
+    removed_dur = 0
+    removed_quality = 0
+
+    print(f"[*] Filtering videos (max {max_dur}s, min {min_height}p)...")
+
+    for vpath in all_videos:
+        fname = os.path.basename(vpath)
+
+        # Check duration
+        if max_dur:
+            dur = get_video_duration(vpath)
+            if dur > max_dur:
+                print(f"  [--] {fname} — too long ({dur:.0f}s)")
+                os.remove(vpath)
+                removed_dur += 1
+                continue
+
+        # Check resolution
+        if min_height:
+            height = get_video_height(vpath)
+            if height > 0 and height < min_height:
+                print(f"  [--] {fname} — low quality ({height}p)")
+                os.remove(vpath)
+                removed_quality += 1
+                continue
+
+        videos.append(vpath)
+
+    if removed_dur or removed_quality:
+        print(f"  [--] Removed: {removed_dur} too long, {removed_quality} low quality\n")
+
+    if not videos:
+        print(f"[!!] No videos passed filters in {config.VIDEO_DIR}")
+        sys.exit(1)
+
+    # Remove any videos that were already posted (check success.txt)
+    posted = load_posted_filenames()
+    already_posted = []
+    clean_videos = []
+    for vpath in videos:
+        fname = os.path.basename(vpath)
+        if fname in posted:
+            already_posted.append(fname)
+            os.remove(vpath)
+        else:
+            clean_videos.append(vpath)
+
+    if already_posted:
+        print(f"  [--] Removed {len(already_posted)} already-posted duplicates\n")
+
+    if not clean_videos:
+        print(f"[!!] No unposted videos in {config.VIDEO_DIR}")
+        sys.exit(1)
+
+    # Shuffle so we don't post in the same order every restart
+    random.shuffle(clean_videos)
+
+    return clean_videos
 
 
 def main() -> None:

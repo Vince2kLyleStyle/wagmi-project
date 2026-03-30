@@ -21,7 +21,7 @@ SESSION_FILE = os.path.join(SESSION_DIR, f"{USERNAME}_session.json")
 PROXY = os.getenv("IG_PROXY", "")
 
 # ─── Video Source ───────────────────────────────────────────────────
-VIDEO_DIR = os.path.join(os.path.dirname(__file__), "tiktok_videos", "motion")
+VIDEO_DIR = os.path.join(os.path.dirname(__file__), "tiktok_videos", os.getenv("NICHE", "motion"))
 
 # ─── Posting Limits ────────────────────────────────────────────────
 DAILY_MIN = 96         # ~2-3 per 30 min over 24h
@@ -29,16 +29,44 @@ DAILY_MAX = 144        # ~3 per 30 min over 24h
 BATCH_SIZE = 3         # videos per mini-batch (2-3 posts per batch)
 
 # ─── Caption ──────────────────────────────────────────────────────
-# Exact caption — used for every upload
+# Proven algorithm captions — these are what grab the IG algorithm.
+# The Japan/Titanic ones are tested and work. Motion ones add brand.
+# You'll paste the new one from the reel when you have it.
 VIRAL_CAPTIONS = [
     (
-        "#🇯🇵Japan is turning footsteps into electricity! "
-        "Using piezoelectric tiles, every step you take generates a small amount of energy. "
-        "Millions of steps together can power LED lights and displays in busy places like "
-        "Shibuya Station. A brilliant way to create a sustainable and smart city • turning m"
+        "🇳🇱 Netherlands is transforming its cities into climate-resilient hubs!\n"
+        "In Rotterdam, innovative \"water plazas\" are being built to tackle flooding "
+        "while doubling as public spaces. These smart urban designs store excess rainwater "
+        "during storms and release it slowly—reducing pressure on drainage systems. "
+        "Beyond flood control, green rooftops and urban gardens help cool the city, "
+        "improve air quality, and boost biodiversity. A powerful example of how cities "
+        "can adapt to climate change while enhancing everyday life 🌍💧🌿\n"
+        "#Netherlands #Rotterdam #ClimateAction #GreenCity #Sustainability "
+        "UrbanDesign EcoFuture SmartCity ClimateChange GreenLiving"
     ),
 ]
 USE_SAME_CAPTION = True
+
+# ─── Watermark ───────────────────────────────────────────────────
+# Overlay text on each video before uploading
+WATERMARK_ENABLED = False
+WATERMARK_TEXT = "$MOTION"
+WATERMARK_FONTSIZE = 42
+WATERMARK_OPACITY = 0.85
+WATERMARK_POSITION = "bottom_right"   # top_left, top_right, bottom_left, bottom_right, center
+WATERMARK_COLOR = "white"
+WATERMARK_FONT = ""                   # leave empty for default, or path to .ttf file
+
+# ─── Pinned Comment ──────────────────────────────────────────────
+# Auto-comment and pin after each upload
+PIN_COMMENT_ENABLED = False
+PIN_COMMENTS = [
+    "Like and follow for motion 🔥💰",
+    "Follow for more motion 🐺",
+    "Motion never stops 💸 Follow for more",
+    "Like + Follow = Motion 🏆",
+    "This is motion. Follow for more 🔥",
+]
 
 # ─── Timing (seconds) ──────────────────────────────────────────────
 # Between videos in a batch
@@ -56,8 +84,16 @@ THROTTLE_SLEEP_MIN = 1800    # 30 min
 THROTTLE_SLEEP_MAX = 7200    # 120 min
 
 # ─── Thumbnail ─────────────────────────────────────────────────────
-USE_FFMPEG_THUMBNAIL = True   # extract a unique frame per video (requires ffmpeg on PATH)
+USE_FFMPEG_THUMBNAIL = True
 FFMPEG_PATH = "ffmpeg"
+
+# ─── Video Duration Filter ───────────────────────────────────────────
+# Auto-delete videos longer than this (seconds). 0 = no limit.
+MAX_VIDEO_DURATION = 60
+
+# ─── Video Quality Filter ────────────────────────────────────────────
+# Auto-delete videos below this resolution (height in pixels). 0 = no limit.
+MIN_VIDEO_HEIGHT = 0
 
 # ─── Logging ────────────────────────────────────────────────────────
 SUCCESS_LOG = os.path.join(os.path.dirname(__file__), "success.txt")
