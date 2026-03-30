@@ -58,11 +58,11 @@ def countdown_timer(seconds: int, label: str = "Batch delay") -> None:
             timer_str = f"{mins}m {secs}s"
         else:
             timer_str = f"{secs}s"
-        print(f"\r  {label}: {timer_str} remaining...   ", end="", flush=True)
+        print(f"  {label}: {timer_str} remaining...", flush=True)
         time.sleep(1)
         remaining -= 1
 
-    print(f"\r  {label}: done!                          ", flush=True)
+    print(f"  {label}: done!", flush=True)
 
 
 # ─── Thumbnail Extraction ──────────────────────────────────────────
