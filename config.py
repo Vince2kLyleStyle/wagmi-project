@@ -21,7 +21,7 @@ SESSION_FILE = os.path.join(SESSION_DIR, f"{USERNAME}_session.json")
 PROXY = os.getenv("IG_PROXY", "")
 
 # ─── Video Source ───────────────────────────────────────────────────
-VIDEO_DIR = os.path.join(os.path.dirname(__file__), "tiktok_videos", "memes")
+VIDEO_DIR = os.path.join(os.path.dirname(__file__), "tiktok_videos", "motion")
 
 # ─── Posting Limits ────────────────────────────────────────────────
 DAILY_MIN = 96         # ~2-3 per 30 min over 24h
@@ -56,7 +56,7 @@ THROTTLE_SLEEP_MIN = 1800    # 30 min
 THROTTLE_SLEEP_MAX = 7200    # 120 min
 
 # ─── Thumbnail ─────────────────────────────────────────────────────
-USE_FFMPEG_THUMBNAIL = False
+USE_FFMPEG_THUMBNAIL = True   # extract a unique frame per video (requires ffmpeg on PATH)
 FFMPEG_PATH = "ffmpeg"
 
 # ─── Logging ────────────────────────────────────────────────────────
