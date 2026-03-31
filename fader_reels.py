@@ -238,6 +238,103 @@ def apply_watermark(video_path: str) -> str | None:
     return None
 
 
+# ─── Emoji Overlay ───────────────────────────────────────────────
+
+def apply_emoji_overlay(video_path: str) -> str | None:
+    """
+    Composite 🥀🥀😢😂 onto the video at middle-right using Pillow + ffmpeg.
+    Returns path to a temp .mp4 with the overlay, or None on failure.
+    Original file is NOT modified.
+    """
+    if not getattr(config, "EMOJI_OVERLAY_ENABLED", False):
+        return None
+
+    emoji_text = "🥀🥀\n😢😂"
+    fontsize = getattr(config, "EMOJI_FONTSIZE", 75)
+
+    try:
+        from PIL import Image, ImageDraw, ImageFont
+
+        # NotoColorEmoji is the only reliable emoji font on Linux
+        emoji_font_paths = [
+            "/usr/share/fonts/truetype/noto/NotoColorEmoji.ttf",
+            "/usr/share/fonts/noto/NotoColorEmoji.ttf",
+            "/usr/share/fonts/truetype/noto-color-emoji/NotoColorEmoji.ttf",
+        ]
+        font = None
+        for fp in emoji_font_paths:
+            if os.path.exists(fp):
+                try:
+                    font = ImageFont.truetype(fp, fontsize)
+                    break
+                except Exception:
+                    continue
+
+        if font is None:
+            print("  [emoji] NotoColorEmoji font not found — run: sudo apt install fonts-noto-color-emoji")
+            return None
+
+        # Render emoji onto a transparent canvas
+        canvas_size = (fontsize * 4, fontsize * 4)
+        canvas = Image.new("RGBA", canvas_size, (0, 0, 0, 0))
+        draw = ImageDraw.Draw(canvas)
+        draw.text((10, 10), emoji_text, font=font, embedded_color=True)
+
+        # Crop to actual content + padding
+        bbox = canvas.getbbox()
+        if not bbox:
+            return None
+        pad = 8
+        bbox = (
+            max(0, bbox[0] - pad),
+            max(0, bbox[1] - pad),
+            min(canvas_size[0], bbox[2] + pad),
+            min(canvas_size[1], bbox[3] + pad),
+        )
+        cropped = canvas.crop(bbox)
+
+        overlay_path = os.path.join(
+            tempfile.gettempdir(),
+            f"fader_emoji_{uuid.uuid4().hex[:8]}.png",
+        )
+        cropped.save(overlay_path, "PNG")
+
+        out_path = os.path.join(
+            tempfile.gettempdir(),
+            f"fader_em_{uuid.uuid4().hex[:8]}.mp4",
+        )
+
+        # Overlay at middle-right with 20px right margin
+        result = subprocess.run(
+            [config.FFMPEG_PATH,
+             "-i", video_path,
+             "-i", overlay_path,
+             "-filter_complex", "[0:v][1:v]overlay=x=W-w-20:y=(H-h)/2",
+             "-codec:a", "copy",
+             "-y", out_path],
+            capture_output=True, text=True, timeout=120,
+        )
+
+        try:
+            os.remove(overlay_path)
+        except OSError:
+            pass
+
+        if result.returncode != 0:
+            print(f"  [emoji] ffmpeg error: {result.stderr[:300]}")
+            return None
+
+        if os.path.exists(out_path) and os.path.getsize(out_path) > 0:
+            return out_path
+
+    except ImportError:
+        print("  [emoji] Pillow not installed — run: pip install Pillow")
+    except Exception as e:
+        print(f"  [emoji] Error (non-fatal): {e}")
+
+    return None
+
+
 # ─── Pinned Comment ───────────────────────────────────────────────
 
 def pin_comment_on_reel(cl: Client, media_id: str, media_pk: str = "") -> bool:
@@ -288,9 +385,14 @@ def upload_reel(cl: Client, video_path: str) -> str | None:
         caption = captions.generate_caption()
     thumbnail = generate_branded_thumbnail(video_path)
 
-    # Apply watermark overlay
+    # Apply watermark then emoji overlay (chain: original → watermarked → emoji)
     watermarked = apply_watermark(video_path)
-    upload_path = watermarked or video_path
+    step1_path = watermarked or video_path
+    emoji_applied = apply_emoji_overlay(step1_path)
+    upload_path = emoji_applied or step1_path
+
+    # Track temp files for cleanup
+    temp_files = [f for f in (watermarked, emoji_applied) if f]
 
     kwargs = {
         "path":    upload_path,
@@ -314,8 +416,12 @@ def upload_reel(cl: Client, video_path: str) -> str | None:
         # Clean up temp files
         if thumbnail and os.path.exists(thumbnail):
             os.remove(thumbnail)
-        if watermarked and os.path.exists(watermarked):
-            os.remove(watermarked)
+        for tf in temp_files:
+            if tf and os.path.exists(tf):
+                try:
+                    os.remove(tf)
+                except OSError:
+                    pass
 
         # Pin comment on the new reel
         time.sleep(random.uniform(2, 5))
@@ -345,11 +451,12 @@ def upload_reel(cl: Client, video_path: str) -> str | None:
                 os.remove(thumbnail)
             except OSError:
                 pass
-        if watermarked and os.path.exists(watermarked):
-            try:
-                os.remove(watermarked)
-            except OSError:
-                pass
+        for tf in temp_files:
+            if tf and os.path.exists(tf):
+                try:
+                    os.remove(tf)
+                except OSError:
+                    pass
 
 
 def check_and_prune(cl: Client) -> bool:
