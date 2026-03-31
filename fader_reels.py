@@ -352,33 +352,32 @@ def upload_reel(cl: Client, video_path: str) -> str | None:
                 pass
 
 
-def prune_dead_posts(cl: Client) -> None:
+def check_and_prune(cl: Client) -> bool:
     """
-    Fetch recent reels and delete any with < PRUNE_MIN_VIEWS views,
-    skipping posts newer than PRUNE_GRACE_MINUTES.
+    Fetch recent reels, delete dead posts, and check for viral momentum.
+    Returns True if surge mode should be active (a post crossed SURGE_THRESHOLD).
     """
-    if not getattr(config, "PRUNE_ENABLED", False):
-        return
-
     min_views = getattr(config, "PRUNE_MIN_VIEWS", 10)
-    grace_minutes = getattr(config, "PRUNE_GRACE_MINUTES", 45)
+    grace_minutes = getattr(config, "PRUNE_GRACE_MINUTES", 180)
+    surge_threshold = getattr(config, "SURGE_THRESHOLD", 10_000)
+    surge_enabled = getattr(config, "SURGE_ENABLED", False)
+    prune_enabled = getattr(config, "PRUNE_ENABLED", False)
     grace_cutoff = datetime.now(timezone.utc) - timedelta(minutes=grace_minutes)
 
-    print(f"\n  [prune] Checking recent posts (delete if <{min_views} views, older than {grace_minutes}min)...")
+    print(f"\n  [check] Scanning recent posts...")
 
     try:
-        user_id = cl.user_id
-        medias = cl.user_medias(user_id, amount=50)
+        medias = cl.user_medias(cl.user_id, amount=50)
     except Exception as e:
-        print(f"  [prune] Could not fetch posts: {e}")
-        return
+        print(f"  [check] Could not fetch posts: {e}")
+        return False
 
     deleted = 0
     skipped_grace = 0
+    surge_active = False
 
     for media in medias:
         try:
-            # Only process reels/video
             media_type = getattr(media, "media_type", None)
             product_type = getattr(media, "product_type", "")
             if media_type not in (2,) and product_type != "clips":
@@ -387,30 +386,34 @@ def prune_dead_posts(cl: Client) -> None:
             taken_at = getattr(media, "taken_at", None)
             if taken_at is None:
                 continue
-
-            # Make timezone-aware if naive
             if taken_at.tzinfo is None:
                 taken_at = taken_at.replace(tzinfo=timezone.utc)
 
-            # Skip posts within grace period
+            views = getattr(media, "view_count", None) or getattr(media, "video_view_count", 0) or 0
+
+            # Surge check — any post going viral?
+            if surge_enabled and views >= surge_threshold:
+                print(f"  [SURGE] Post {media.pk} has {views:,} views — SURGE MODE ON")
+                surge_active = True
+
+            # Skip grace period for pruning
             if taken_at > grace_cutoff:
                 skipped_grace += 1
                 continue
 
-            views = getattr(media, "view_count", None) or getattr(media, "video_view_count", 0) or 0
-
-            if views < min_views:
-                media_pk = str(media.pk)
-                cl.media_delete(media_pk)
-                print(f"  [prune] Deleted {media_pk} ({views} views)")
+            # Prune dead posts
+            if prune_enabled and views < min_views:
+                cl.media_delete(str(media.pk))
+                print(f"  [prune] Deleted {media.pk} ({views} views)")
                 deleted += 1
-                time.sleep(random.uniform(2, 4))  # brief delay between deletions
+                time.sleep(random.uniform(2, 4))
 
         except Exception as e:
-            print(f"  [prune] Error on media {getattr(media, 'pk', '?')}: {e}")
+            print(f"  [check] Error on media {getattr(media, 'pk', '?')}: {e}")
             continue
 
-    print(f"  [prune] Done — deleted {deleted}, skipped {skipped_grace} (still in grace period)\n")
+    print(f"  [check] Done — deleted {deleted}, skipped {skipped_grace} in grace | surge={'ON' if surge_active else 'off'}\n")
+    return surge_active
 
 
 def log_success(filename: str, media_id: str) -> None:
@@ -612,6 +615,7 @@ def main() -> None:
     batch_num = 0
     video_idx = 0
     session_start = datetime.now()
+    surge_mode = False
 
     # ─── Main Upload Loop ───────────────────────────────────────
     while video_idx < total_videos:
@@ -724,21 +728,29 @@ def main() -> None:
         # ── Batch complete ──────────────────────────────────────
         print(f"\n  Batch {batch_num}/{total_batches} complete!")
 
-        # ── Prune dead posts every N batches ────────────────────
+        # ── Check posts + prune every N batches ─────────────────
         prune_interval = getattr(config, "PRUNE_INTERVAL_BATCHES", 4)
         if batch_num % prune_interval == 0:
-            prune_dead_posts(cl)
+            surge_mode = check_and_prune(cl)
 
-        # Inter-batch delay (Gaussian jitter)
+        # Inter-batch delay — cut in half during surge
         if video_idx < total_videos and uploads_today < daily_cap:
-            delay = gaussian_delay(
-                config.INTER_BATCH_CENTER,
-                config.INTER_BATCH_SPREAD,
-                config.INTER_BATCH_FLOOR,
-                config.INTER_BATCH_CEIL,
-            )
-            mins, secs = divmod(delay, 60)
-            print(f"  Batch delay: {mins}m {secs}s")
+            if surge_mode and getattr(config, "SURGE_ENABLED", False):
+                delay = gaussian_delay(
+                    config.SURGE_INTER_BATCH_CENTER,
+                    config.INTER_BATCH_SPREAD,
+                    config.SURGE_INTER_BATCH_FLOOR,
+                    config.SURGE_INTER_BATCH_CEIL,
+                )
+                print(f"  SURGE MODE — batch delay: {delay // 60}m {delay % 60}s")
+            else:
+                delay = gaussian_delay(
+                    config.INTER_BATCH_CENTER,
+                    config.INTER_BATCH_SPREAD,
+                    config.INTER_BATCH_FLOOR,
+                    config.INTER_BATCH_CEIL,
+                )
+                print(f"  Batch delay: {delay // 60}m {delay % 60}s")
             countdown_timer(delay, "Batch delay")
 
     # ─── Done ───────────────────────────────────────────────────

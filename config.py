@@ -74,7 +74,17 @@ PIN_COMMENTS = [
 PRUNE_ENABLED = True
 PRUNE_INTERVAL_BATCHES = 4     # run prune every 4 batches (~2 hrs)
 PRUNE_MIN_VIEWS = 10           # delete posts with fewer than this many views
-PRUNE_GRACE_MINUTES = 45       # never delete posts newer than this
+PRUNE_GRACE_MINUTES = 180      # 3 hours — gives slow cookers time to pop
+
+# ─── Surge Mode ──────────────────────────────────────────────────────
+# When any recent post crosses SURGE_THRESHOLD views, cut inter-batch delay
+# in half to flood the algorithm while we already have momentum.
+# Surge stays active until the next check cycle finds no viral posts.
+SURGE_ENABLED = True
+SURGE_THRESHOLD = 10_000       # views needed to trigger surge
+SURGE_INTER_BATCH_CENTER = 900  # 15 min between batches (vs normal 30)
+SURGE_INTER_BATCH_FLOOR = 750   # never less than 12.5 min
+SURGE_INTER_BATCH_CEIL = 1050   # never more than 17.5 min
 
 # ─── Timing (seconds) ──────────────────────────────────────────────
 # Between videos in a batch
