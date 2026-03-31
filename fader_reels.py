@@ -41,6 +41,7 @@ import config
 import captions
 import devices
 import human_sim
+from instagram_uploader import from_instagrapi_client
 
 
 # ─── Fancy Countdown Timer (matches old Fader style) ───────────────
@@ -373,10 +374,11 @@ def pin_comment_on_reel(cl: Client, media_id: str, media_pk: str = "") -> bool:
 
 # ─── Upload Logic ──────────────────────────────────────────────────
 
-def upload_reel(cl: Client, video_path: str) -> str | None:
+def upload_reel(cl: Client, video_path: str, raw_uploader=None) -> str | None:
     """
     Upload a single Reel. Returns the media ID on success, None on failure.
-    Applies watermark if enabled, pins comment after upload.
+    Uses raw_uploader (InstagramReelsUploader) if provided, otherwise falls
+    back to instagrapi clip_upload.
     """
     # Pick from the 3 preset captions, or use the random generator
     if config.USE_SAME_CAPTION:
@@ -402,16 +404,31 @@ def upload_reel(cl: Client, video_path: str) -> str | None:
         kwargs["thumbnail"] = thumbnail
 
     try:
-        import concurrent.futures
-        with concurrent.futures.ThreadPoolExecutor(max_workers=1) as executor:
-            future = executor.submit(cl.clip_upload, **kwargs)
-            try:
-                media = future.result(timeout=300)  # 5 min max per upload
-            except concurrent.futures.TimeoutError:
-                print(f"\n  [!!] Upload timed out after 5 minutes — skipping")
+        if raw_uploader is not None:
+            # ── Raw iOS uploader (preferred — real iPhone fingerprint) ──
+            result = raw_uploader.upload_reel(
+                video_path=upload_path,
+                caption=caption,
+                thumbnail_path=thumbnail,
+            )
+            if result.get("status") != "ok":
+                print(f"\n  [!!] Raw uploader failed: {result.get('message', result)}")
                 return None
-        media_pk = str(media.pk) if hasattr(media, "pk") else str(media)
-        media_full_id = media.id if hasattr(media, "id") else media_pk
+            media_obj  = result.get("media", {})
+            media_pk   = str(media_obj.get("pk", ""))
+            media_full_id = str(media_obj.get("id", media_pk))
+        else:
+            # ── Fallback: instagrapi clip_upload ──
+            import concurrent.futures
+            with concurrent.futures.ThreadPoolExecutor(max_workers=1) as executor:
+                future = executor.submit(cl.clip_upload, **kwargs)
+                try:
+                    media = future.result(timeout=300)
+                except concurrent.futures.TimeoutError:
+                    print(f"\n  [!!] Upload timed out after 5 minutes — skipping")
+                    return None
+            media_pk      = str(media.pk) if hasattr(media, "pk") else str(media)
+            media_full_id = media.id if hasattr(media, "id") else media_pk
 
         # Clean up temp files
         if thumbnail and os.path.exists(thumbnail):
@@ -703,6 +720,15 @@ def main() -> None:
     print("[*] Logging in...")
     cl = create_client(session_file)
 
+    # ─── Raw uploader (iOS fingerprint) ─────────────────────────
+    print("[*] Building raw iOS uploader...")
+    try:
+        raw_uploader = from_instagrapi_client(cl, proxy=config.PROXY or None)
+        print("[*] Raw uploader ready — using iOS fingerprint\n")
+    except Exception as e:
+        print(f"[!] Raw uploader init failed ({e}) — falling back to instagrapi\n")
+        raw_uploader = None
+
     # ─── Warm-up ────────────────────────────────────────────────
     if not args.skip_warmup:
         human_sim.warmup_session(cl)
@@ -794,7 +820,7 @@ def main() -> None:
             human_sim.pre_upload_pause()
 
             print(f"\n  Uploading [{video_idx + 1}/{total_videos}]: {filename}")
-            result = upload_reel(cl, vpath)
+            result = upload_reel(cl, vpath, raw_uploader=raw_uploader)
 
             if result == "THROTTLED":
                 # Rate limited — long sleep then retry once
@@ -803,19 +829,20 @@ def main() -> None:
                 )
                 print(f"  [throttle] Sleeping {sleep_sec // 60}m before retry...")
                 countdown_timer(sleep_sec, "Throttle cooldown")
-                result = upload_reel(cl, vpath)
+                result = upload_reel(cl, vpath, raw_uploader=raw_uploader)
 
             if result == "CHALLENGE":
                 print("  [!!] Challenge detected — pausing 2 hours.")
                 print("  [!!] You may need to manually verify on the app.")
                 countdown_timer(7200, "Challenge pause")
-                # Try re-login
                 cl = relogin_client(cl, session_file)
-                result = upload_reel(cl, vpath)
+                raw_uploader = from_instagrapi_client(cl, proxy=config.PROXY or None)
+                result = upload_reel(cl, vpath, raw_uploader=raw_uploader)
 
             if result == "LOGIN_EXPIRED":
                 cl = relogin_client(cl, session_file)
-                result = upload_reel(cl, vpath)
+                raw_uploader = from_instagrapi_client(cl, proxy=config.PROXY or None)
+                result = upload_reel(cl, vpath, raw_uploader=raw_uploader)
 
             if result and result not in ("THROTTLED", "CHALLENGE", "LOGIN_EXPIRED"):
                 # Success!
