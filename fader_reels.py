@@ -620,17 +620,30 @@ def main() -> None:
     # ─── Main Upload Loop ───────────────────────────────────────
     while video_idx < total_videos:
 
-        # ── Rest window check ───────────────────────────────────
-        if getattr(config, "REST_WINDOW_ENABLED", False):
-            now_hour = datetime.now().hour
-            rest_start = getattr(config, "REST_WINDOW_START", 2)
-            rest_end = getattr(config, "REST_WINDOW_END", 6)
-            if rest_start <= now_hour < rest_end:
-                resume = datetime.now().replace(hour=rest_end, minute=random.randint(0, 15), second=0, microsecond=0)
-                sleep_sec = max(0, int((resume - datetime.now()).total_seconds()))
-                print(f"\n  [rest] Sleeping until {resume.strftime('%H:%M')} — rest window active")
-                countdown_timer(sleep_sec, "Rest window")
-                human_sim.warmup_session(cl)
+        # ── Rest window / active window check ───────────────────
+        now_hour = datetime.now().hour
+        rest_start = getattr(config, "REST_WINDOW_START", 2)
+        rest_end = getattr(config, "REST_WINDOW_END", 6)
+        active_start = getattr(config, "ACTIVE_WINDOW_START", 11)
+        active_end = getattr(config, "ACTIVE_WINDOW_END", 26)  # 26 = wraps past midnight
+
+        # Normalize active_end for comparison (26 means next day up to 2am)
+        in_active = (now_hour >= active_start) or (active_end > 24 and now_hour < (active_end - 24))
+
+        if getattr(config, "REST_WINDOW_ENABLED", False) and rest_start <= now_hour < rest_end:
+            resume = datetime.now().replace(hour=rest_end, minute=random.randint(0, 15), second=0, microsecond=0)
+            sleep_sec = max(0, int((resume - datetime.now()).total_seconds()))
+            print(f"\n  [rest] Sleeping until {resume.strftime('%H:%M')} — rest window")
+            countdown_timer(sleep_sec, "Rest window")
+            human_sim.warmup_session(cl)
+        elif getattr(config, "ACTIVE_WINDOW_ENABLED", False) and not in_active:
+            resume = datetime.now().replace(hour=active_start, minute=random.randint(0, 10), second=0, microsecond=0)
+            if resume < datetime.now():
+                resume = resume.replace(day=resume.day + 1)
+            sleep_sec = max(0, int((resume - datetime.now()).total_seconds()))
+            print(f"\n  [waiting] Outside active hours — resuming at {resume.strftime('%H:%M')}")
+            countdown_timer(sleep_sec, "Waiting for active window")
+            human_sim.warmup_session(cl)
 
         # ── Daily cap check ─────────────────────────────────────
         if uploads_today >= daily_cap:

@@ -63,6 +63,13 @@ REST_WINDOW_ENABLED = True
 REST_WINDOW_START = 2              # 2am
 REST_WINDOW_END = 6                # 6am (4 hour rest)
 
+# ─── Active Window ───────────────────────────────────────────────
+# Only post during these hours — peak engagement time.
+# Outside this window the bot pauses until the window opens.
+ACTIVE_WINDOW_ENABLED = True
+ACTIVE_WINDOW_START = 11           # 11am
+ACTIVE_WINDOW_END = 26             # 2am next day (26 = 24+2, wraps midnight)
+
 # ─── Pinned Comment ──────────────────────────────────────────────
 # Auto-comment and pin after each upload
 PIN_COMMENT_ENABLED = False
@@ -113,7 +120,7 @@ FFMPEG_PATH = "ffmpeg"
 
 # ─── Video Duration Filter ───────────────────────────────────────────
 # Auto-delete videos longer than this (seconds). 0 = no limit.
-MAX_VIDEO_DURATION = 60
+MAX_VIDEO_DURATION = 30                # short clips rewatch better = more explore push
 
 # ─── Video Quality Filter ────────────────────────────────────────────
 # Auto-delete videos below this resolution (height in pixels). 0 = no limit.
