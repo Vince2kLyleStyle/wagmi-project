@@ -48,8 +48,8 @@ def warmup_session(cl: Client) -> None:
             print("  [warmup] no feed items, skipping")
             return
 
-        # Like 3-6 random posts
-        count = min(random.randint(3, 6), len(items))
+        # Like 8-14 random posts with natural pauses between
+        count = min(random.randint(8, 14), len(items))
         to_like = random.sample(items, k=count)
 
         for media in to_like:
@@ -60,7 +60,7 @@ def warmup_session(cl: Client) -> None:
                     print(f"    liked media {media_id}")
             except Exception:
                 pass
-            _pause(3, 10)
+            _pause(5, 18)
 
     except Exception as e:
         print(f"  [warmup] error (non-fatal): {e}")

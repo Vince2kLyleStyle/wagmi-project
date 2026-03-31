@@ -49,13 +49,19 @@ USE_SAME_CAPTION = True
 
 # ─── Watermark ───────────────────────────────────────────────────
 # Overlay text on each video before uploading
-WATERMARK_ENABLED = False
+WATERMARK_ENABLED = True
 WATERMARK_TEXT = "$MOTION"
-WATERMARK_FONTSIZE = 42
-WATERMARK_OPACITY = 0.85
-WATERMARK_POSITION = "bottom_right"   # top_left, top_right, bottom_left, bottom_right, center
+WATERMARK_FONTSIZE = 36
+WATERMARK_OPACITY = 0.45          # subtle — visible but not distracting
+WATERMARK_POSITION = "bottom_right"
 WATERMARK_COLOR = "white"
-WATERMARK_FONT = ""                   # leave empty for default, or path to .ttf file
+WATERMARK_FONT = ""
+
+# ─── Rest Window ─────────────────────────────────────────────────
+# No posting during these hours (24h format). Bot sleeps and resumes after.
+REST_WINDOW_ENABLED = True
+REST_WINDOW_START = 2              # 2am
+REST_WINDOW_END = 6                # 6am (4 hour rest)
 
 # ─── Pinned Comment ──────────────────────────────────────────────
 # Auto-comment and pin after each upload

@@ -620,6 +620,18 @@ def main() -> None:
     # ─── Main Upload Loop ───────────────────────────────────────
     while video_idx < total_videos:
 
+        # ── Rest window check ───────────────────────────────────
+        if getattr(config, "REST_WINDOW_ENABLED", False):
+            now_hour = datetime.now().hour
+            rest_start = getattr(config, "REST_WINDOW_START", 2)
+            rest_end = getattr(config, "REST_WINDOW_END", 6)
+            if rest_start <= now_hour < rest_end:
+                resume = datetime.now().replace(hour=rest_end, minute=random.randint(0, 15), second=0, microsecond=0)
+                sleep_sec = max(0, int((resume - datetime.now()).total_seconds()))
+                print(f"\n  [rest] Sleeping until {resume.strftime('%H:%M')} — rest window active")
+                countdown_timer(sleep_sec, "Rest window")
+                human_sim.warmup_session(cl)
+
         # ── Daily cap check ─────────────────────────────────────
         if uploads_today >= daily_cap:
             now = datetime.now()
