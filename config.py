@@ -60,15 +60,13 @@ WATERMARK_FONT = ""
 # ─── Rest Window ─────────────────────────────────────────────────
 # No posting during these hours (24h format). Bot sleeps and resumes after.
 REST_WINDOW_ENABLED = True
-REST_WINDOW_START = 2              # 2am
-REST_WINDOW_END = 6                # 6am (4 hour rest)
+REST_WINDOW_START = 3              # 3am
+REST_WINDOW_END = 9                # 9am — 6 hour rest covering the true dead zone
 
 # ─── Active Window ───────────────────────────────────────────────
 # Only post during these hours — peak engagement time.
 # Outside this window the bot pauses until the window opens.
-ACTIVE_WINDOW_ENABLED = True
-ACTIVE_WINDOW_START = 11           # 11am
-ACTIVE_WINDOW_END = 26             # 2am next day (26 = 24+2, wraps midnight)
+ACTIVE_WINDOW_ENABLED = False      # not needed — rest window handles dead hours
 
 # ─── Pinned Comment ──────────────────────────────────────────────
 # Auto-comment and pin after each upload
