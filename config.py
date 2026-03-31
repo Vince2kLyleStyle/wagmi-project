@@ -68,6 +68,14 @@ PIN_COMMENTS = [
     "This is motion. Follow for more 🔥",
 ]
 
+# ─── Auto-Prune Dead Posts ───────────────────────────────────────────
+# After every N batches, fetch recent posts and delete any with < MIN_VIEWS
+# that are older than GRACE_MINUTES (to let new posts warm up first).
+PRUNE_ENABLED = True
+PRUNE_INTERVAL_BATCHES = 4     # run prune every 4 batches (~2 hrs)
+PRUNE_MIN_VIEWS = 10           # delete posts with fewer than this many views
+PRUNE_GRACE_MINUTES = 45       # never delete posts newer than this
+
 # ─── Timing (seconds) ──────────────────────────────────────────────
 # Between videos in a batch
 INTRA_BATCH_MIN = 20

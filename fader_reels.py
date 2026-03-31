@@ -25,7 +25,7 @@ import sys
 import tempfile
 import time
 import uuid
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 from instagrapi import Client
@@ -352,6 +352,67 @@ def upload_reel(cl: Client, video_path: str) -> str | None:
                 pass
 
 
+def prune_dead_posts(cl: Client) -> None:
+    """
+    Fetch recent reels and delete any with < PRUNE_MIN_VIEWS views,
+    skipping posts newer than PRUNE_GRACE_MINUTES.
+    """
+    if not getattr(config, "PRUNE_ENABLED", False):
+        return
+
+    min_views = getattr(config, "PRUNE_MIN_VIEWS", 10)
+    grace_minutes = getattr(config, "PRUNE_GRACE_MINUTES", 45)
+    grace_cutoff = datetime.now(timezone.utc) - timedelta(minutes=grace_minutes)
+
+    print(f"\n  [prune] Checking recent posts (delete if <{min_views} views, older than {grace_minutes}min)...")
+
+    try:
+        user_id = cl.user_id
+        medias = cl.user_medias(user_id, amount=50)
+    except Exception as e:
+        print(f"  [prune] Could not fetch posts: {e}")
+        return
+
+    deleted = 0
+    skipped_grace = 0
+
+    for media in medias:
+        try:
+            # Only process reels/video
+            media_type = getattr(media, "media_type", None)
+            product_type = getattr(media, "product_type", "")
+            if media_type not in (2,) and product_type != "clips":
+                continue
+
+            taken_at = getattr(media, "taken_at", None)
+            if taken_at is None:
+                continue
+
+            # Make timezone-aware if naive
+            if taken_at.tzinfo is None:
+                taken_at = taken_at.replace(tzinfo=timezone.utc)
+
+            # Skip posts within grace period
+            if taken_at > grace_cutoff:
+                skipped_grace += 1
+                continue
+
+            views = getattr(media, "view_count", None) or getattr(media, "video_view_count", 0) or 0
+
+            if views < min_views:
+                media_pk = str(media.pk)
+                cl.media_delete(media_pk)
+                print(f"  [prune] Deleted {media_pk} ({views} views)")
+                deleted += 1
+                time.sleep(random.uniform(2, 4))  # brief delay between deletions
+
+        except Exception as e:
+            print(f"  [prune] Error on media {getattr(media, 'pk', '?')}: {e}")
+            continue
+
+    print(f"  [prune] Done — deleted {deleted}, skipped {skipped_grace} (still in grace period)\n")
+
+
 def log_success(filename: str, media_id: str) -> None:
     """Append to success.txt exactly like old Fader."""
     timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
@@ -662,6 +723,11 @@ def main() -> None:
 
         # ── Batch complete ──────────────────────────────────────
         print(f"\n  Batch {batch_num}/{total_batches} complete!")
+
+        # ── Prune dead posts every N batches ────────────────────
+        prune_interval = getattr(config, "PRUNE_INTERVAL_BATCHES", 4)
+        if batch_num % prune_interval == 0:
+            prune_dead_posts(cl)
 
         # Inter-batch delay (Gaussian jitter)
         if video_idx < total_videos and uploads_today < daily_cap:
