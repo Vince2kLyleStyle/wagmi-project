@@ -37,13 +37,34 @@ def run_adb(cmd: list) -> str:
         return ""
 
 
+def connect_bluestacks():
+    """Auto-connect to BlueStacks via ADB. Tries common ports."""
+    ports = [5555, 5556, 5565, 5575]
+    for port in ports:
+        out = run_adb(["connect", f"127.0.0.1:{port}"])
+        if "connected" in out.lower():
+            print(f"[+] Connected to BlueStacks on 127.0.0.1:{port}")
+            import time
+            time.sleep(2)
+            return True
+    return False
+
+
 def check_device():
+    # First try to auto-connect to BlueStacks
     out = run_adb(["devices"])
     lines = [l for l in out.splitlines() if "\tdevice" in l]
+
     if not lines:
-        print("[!!] No BlueStacks device found via ADB.")
-        print("     1. Open BlueStacks")
-        print("     2. Go to Settings > Advanced > Turn ON Android Debug Bridge")
+        print("[*] No ADB device found — trying to connect to BlueStacks...")
+        connect_bluestacks()
+        out = run_adb(["devices"])
+        lines = [l for l in out.splitlines() if "\tdevice" in l]
+
+    if not lines:
+        print("[!!] Could not connect to BlueStacks.")
+        print("     1. Make sure BlueStacks is open and Instagram is logged in")
+        print("     2. Go to BlueStacks Settings > Advanced > Android Debug Bridge > ON")
         print("     3. Re-run this script")
         sys.exit(1)
     print(f"[+] Device found: {lines[0].split()[0]}")

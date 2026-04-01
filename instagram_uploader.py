@@ -256,12 +256,12 @@ class InstagramReelsUploader:
         width    = video_info["width"]
         height   = video_info["height"]
 
-        # Device block (matches what the real Instagram iOS app sends)
+        # Device block — matches Samsung S24 Ultra fingerprint in headers
         device = {
-            "manufacturer":    "Apple",
-            "model":           IOS_DEVICE,
-            "android_version": 26,
-            "android_release": "8.0.0",
+            "manufacturer":    MANUFACTURER,
+            "model":           MODEL,
+            "android_version": int(ANDROID_VERSION),
+            "android_release": ANDROID_RELEASE,
         }
 
         payload = {

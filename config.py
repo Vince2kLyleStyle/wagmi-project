@@ -48,7 +48,7 @@ VIRAL_CAPTIONS = [
 USE_SAME_CAPTION = True
 
 # ─── Emoji Overlay ───────────────────────────────────────────────
-# Renders 🥀🥀😢😂 at middle-right of every video before uploading.
+# Renders 🥀🥀😭😂 at middle-right of every video before uploading.
 # Requires NotoColorEmoji font (sudo apt install fonts-noto-color-emoji)
 EMOJI_OVERLAY_ENABLED = True
 EMOJI_FONTSIZE = 75          # semi-small on a 1080p frame
