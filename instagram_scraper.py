@@ -145,6 +145,22 @@ def get_reels_for_tag(cl: Client, hashtag: str, amount: int) -> list:
     return medias
 
 
+def get_explore_reels(cl: Client, amount: int = 50) -> list:
+    """Fetch Reels from the account's personalised Explore page."""
+    medias = []
+    try:
+        posts = cl.explore_posts(max_amount=amount)
+        medias = [p for p in posts if is_reel(p)]
+        print(f"  Explore page — {len(medias)} reels found (from {len(posts)} posts)")
+        time.sleep(random.uniform(2, 4))
+    except (PleaseWaitFewMinutes, RateLimitError):
+        print(f"  [scraper] Rate limited on explore — sleeping 60s")
+        time.sleep(60)
+    except Exception as e:
+        print(f"  [scraper] Explore page error: {e}")
+    return medias
+
+
 def get_reels_for_account(cl: Client, username: str, amount: int) -> list:
     """Fetch recent Reels from a specific account."""
     try:
@@ -318,6 +334,17 @@ def main():
                 print(f"         failed — skipping")
 
         return count
+
+    # ── Phase 0: Explore page (personalised — best source) ────────
+    if not args.accounts_only and not args.hashtags_only:
+        print(f"{'─'*54}")
+        print(f"  PHASE 0 — Explore page (your personalised feed)")
+        print(f"{'─'*54}")
+        explore_medias = get_explore_reels(cl, amount=80)
+        got = process_media_list(explore_medias, "explore", min_views)
+        if got:
+            print(f"  Explore → {got} videos downloaded\n")
+        time.sleep(random.uniform(5, 10))
 
     # ── Phase 1: Competitor accounts (trusted, lower view bar) ─────
     if not args.hashtags_only:
