@@ -43,6 +43,7 @@ COMPETITOR_ACCOUNTS = [
     "memeyahu",
     "twinkpotato",
     "womenconsumer",
+    "uncrustamemes",
 ]
 ACCOUNT_MIN_VIEWS   = 50_000   # lower bar — we trust these accounts
 AMOUNT_PER_ACCOUNT  = 30       # reels to pull per account
