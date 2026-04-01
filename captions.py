@@ -25,15 +25,10 @@ TEMPLATES = [
     "bookmark this one {emoji} {hashtags}",
     "{emoji} mood {hashtags}",
     "tag someone who needs to see this {emoji} {hashtags}",
-    "{emoji} what do you think? {hashtags}",
     "watch till the end {emoji} {hashtags}",
     "{emoji} follow for more {hashtags}",
-    "share this with a friend {emoji} {hashtags}",
-    "{emoji} just vibes {hashtags}",
-    "double tap if you agree {emoji} {hashtags}",
-    "{emoji} this {hashtags}",
     "say less {emoji} {hashtags}",
-    "{emoji} drop a {emoji} if you relate {hashtags}",
+    "{emoji} drop a comment if you relate {hashtags}",
 ]
 
 # ─── Emoji Pool ─────────────────────────────────────────────────────
@@ -46,18 +41,16 @@ EMOJIS = [
 # ─── Hashtag Pool ───────────────────────────────────────────────────
 # Organised by category. The generator picks from mixed categories.
 HASHTAG_POOL = [
-    # Viral / general
+    # Broad viral — these hit explore
     "#viral", "#fyp", "#foryou", "#explore", "#trending",
-    "#reels", "#reelsinstagram", "#instareels", "#viralreels",
-    "#foryoupage", "#explorepage", "#discover",
+    "#reels", "#reelsinstagram", "#viralreels", "#explorepage",
+    "#foryoupage", "#trending", "#discover",
+    # Broad interest topics
+    "#facts", "#didyouknow", "#history", "#mindblown", "#psychology",
+    "#motivation", "#mindset", "#success", "#lifestyle", "#learning",
+    "#interesting", "#knowledge", "#science", "#nature", "#world",
     # Engagement
-    "#follow", "#followme", "#like", "#share", "#comment",
-    "#likeforlikes", "#followforfollowback",
-    # Niche — edit these to match YOUR content niche
-    "#motivation", "#lifestyle", "#funny", "#relatable",
-    "#memes", "#comedy", "#entertainment", "#dailyvlog",
-    "#inspo", "#aesthetic", "#mood", "#vibes",
-    "#contentcreator", "#creator", "#influencer",
+    "#follow", "#like", "#share", "#comment", "#saveforlater",
 ]
 
 

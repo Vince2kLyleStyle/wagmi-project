@@ -183,6 +183,16 @@ else:
     )
 print()
 
+# ── Thumbnail ─────────────────────────────────────────────────────
+print("  [ Thumbnail ]")
+thumb_file = os.path.join(os.path.dirname(__file__), "thumbnail.jpg")
+check(
+    "thumbnail.jpg present (consistent cover frame)",
+    os.path.exists(thumb_file),
+    fix="Drop your thumbnail.jpg into the wagmi-project folder"
+)
+print()
+
 # ── Video folder ──────────────────────────────────────────────────
 print("  [ Content ]")
 video_dir = os.path.join(os.path.dirname(__file__), "tiktok_videos", "motion")

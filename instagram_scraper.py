@@ -74,6 +74,7 @@ AMOUNT_PER_TAG  = 15         # how many posts to check per hashtag (top + recent
 # ─── Paths ────────────────────────────────────────────────────────
 DOWNLOAD_DIR    = os.path.join(os.path.dirname(__file__), "tiktok_videos", "motion")
 SEEN_LOG        = os.path.join(os.path.dirname(__file__), "ig_scraped.txt")
+CAPTION_LOG     = os.path.join(os.path.dirname(__file__), "scraped_captions.txt")
 SESSION_FILE    = config.SESSION_FILE
 
 
@@ -88,6 +89,14 @@ def load_seen_ids() -> set:
 def mark_seen(pk: str):
     with open(SEEN_LOG, "a") as f:
         f.write(pk + "\n")
+
+
+def save_caption(caption: str):
+    """Save a scraped caption to scraped_captions.txt for reuse as viral captions."""
+    if not caption or len(caption) < 30:
+        return
+    with open(CAPTION_LOG, "a", encoding="utf-8") as f:
+        f.write(caption.replace("\n", " ").strip() + "\n")
 
 
 def login() -> Client:
@@ -276,8 +285,11 @@ def main():
             if not passes:
                 continue
 
-            user = getattr(getattr(media, "user", None), "username", "unknown")
+            user    = getattr(getattr(media, "user", None), "username", "unknown")
+            caption = getattr(media, "caption_text", "") or ""
             print(f"    [{downloaded+1}] @{user} — {views:,} views, {dur:.0f}s")
+            # Save caption for reuse as viral caption
+            save_caption(caption)
 
             if args.dry_run:
                 mark_seen(pk)

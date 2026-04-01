@@ -29,9 +29,10 @@ DAILY_MAX = 96         # fixed — exactly 3 every 30 min
 BATCH_SIZE = 3         # 3 videos per batch
 
 # ─── Caption ──────────────────────────────────────────────────────
-# Proven algorithm captions — these are what grab the IG algorithm.
-# The Japan/Titanic ones are tested and work. Motion ones add brand.
-# You'll paste the new one from the reel when you have it.
+# These are VIRAL TRENDING TOPIC captions — not niche-specific.
+# The trick: broad trending topics push posts to explore, regardless of video content.
+# Rotate these so each post looks unique. Add new trending ones as you find them.
+# Pro tip: grab captions from @memeyahu @twinkpotato @womenconsumer posts that went viral.
 VIRAL_CAPTIONS = [
     (
         "🇳🇱 Netherlands is transforming its cities into climate-resilient hubs!\n"
@@ -42,10 +43,47 @@ VIRAL_CAPTIONS = [
         "improve air quality, and boost biodiversity. A powerful example of how cities "
         "can adapt to climate change while enhancing everyday life 🌍💧🌿\n"
         "#Netherlands #Rotterdam #ClimateAction #GreenCity #Sustainability "
-        "UrbanDesign EcoFuture SmartCity ClimateChange GreenLiving"
+        "#UrbanDesign #EcoFuture #SmartCity #ClimateChange #GreenLiving"
+    ),
+    (
+        "🇯🇵 Japan's work culture is unlike anything in the world.\n"
+        "From 'Inemuri' — the practice of sleeping at work as a sign of dedication — "
+        "to employees who haven't taken a day off in years. "
+        "Japan ranks among the most productive nations on earth, yet burnout is at an all-time high. "
+        "Is extreme dedication admirable or dangerous? 🤔\n"
+        "#Japan #WorkCulture #Productivity #JapanLife #Tokyo #Hustle "
+        "#WorkEthic #JapaneseLifestyle #Dedication #Mindset"
+    ),
+    (
+        "🚢 The Titanic had a second ship — and almost nobody talks about it.\n"
+        "The RMS Olympic was the Titanic's sister ship, nearly identical in every way. "
+        "It sailed for 24 years without major incident. "
+        "Some historians believe the ships were secretly swapped for insurance fraud. "
+        "The Olympic was quietly scrapped in 1935. The mystery was never solved. 🧊\n"
+        "#Titanic #History #Conspiracy #RMSOlympic #HistoryFacts "
+        "#MindBlown #DidYouKnow #HistoryLovers #Mystery #Facts"
+    ),
+    (
+        "🧠 Your brain makes 35,000 decisions every single day.\n"
+        "Most of them happen without you even realizing it. "
+        "The food you choose, the route you take, the words you say — "
+        "almost all of it runs on autopilot. "
+        "The people who master their habits master their life. "
+        "Build the right systems and your brain does the rest. 💡\n"
+        "#Psychology #Mindset #Brain #Habits #SelfImprovement "
+        "#MentalHealth #Motivation #PersonalDevelopment #Success #GrowthMindset"
+    ),
+    (
+        "🏛️ Rome wasn't built in a day — but it was burned in one.\n"
+        "In 64 AD, a fire swept through Rome for six days, destroying 10 of its 14 districts. "
+        "Emperor Nero reportedly played the lyre while watching the flames. "
+        "Whether he started it or not, he used the disaster to build his golden palace. "
+        "History's most powerful lesson: chaos always creates opportunity. 🔥\n"
+        "#History #Rome #AncientRome #DidYouKnow #HistoryFacts "
+        "#Nero #RomanEmpire #Facts #HistoryLovers #MindBlown"
     ),
 ]
-USE_SAME_CAPTION = True
+USE_SAME_CAPTION = True  # picks one randomly per post — add more as you find trending ones
 
 # ─── Emoji Overlay ───────────────────────────────────────────────
 # Renders 🥀🥀😭😂 at middle-right of every video before uploading.
