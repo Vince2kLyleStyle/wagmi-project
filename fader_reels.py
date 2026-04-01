@@ -250,7 +250,7 @@ def apply_emoji_overlay(video_path: str) -> str | None:
     if not getattr(config, "EMOJI_OVERLAY_ENABLED", False):
         return None
 
-    emoji_text = "🥀🥀\n😢😂"
+    emoji_text = "🥀🥀\n😭😂"
     fontsize = getattr(config, "EMOJI_FONTSIZE", 75)
 
     try:
