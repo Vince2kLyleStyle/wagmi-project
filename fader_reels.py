@@ -41,7 +41,7 @@ import config
 import captions
 import devices
 import human_sim
-from instagram_uploader import from_instagrapi_client
+from instagram_uploader import from_instagrapi_client, from_bluestacks_token
 
 
 # ─── Fancy Countdown Timer (matches old Fader style) ───────────────
@@ -667,14 +667,19 @@ def main() -> None:
     print("[*] Logging in...")
     cl = create_client(session_file)
 
-    # ─── Raw uploader (iOS fingerprint) ─────────────────────────
-    print("[*] Building raw iOS uploader...")
-    try:
-        raw_uploader = from_instagrapi_client(cl, proxy=config.PROXY or None)
-        print("[*] Raw uploader ready — using iOS fingerprint\n")
-    except Exception as e:
-        print(f"[!] Raw uploader init failed ({e}) — falling back to instagrapi\n")
-        raw_uploader = None
+    # ─── Raw uploader — BlueStacks token preferred ───────────────
+    proxy = config.PROXY or None
+    raw_uploader = from_bluestacks_token(proxy=proxy)
+    if raw_uploader:
+        print("[*] Using BlueStacks token — real Android fingerprint\n")
+    else:
+        print("[*] No BlueStacks token found — using instagrapi session")
+        print("[!] Run extract_token.py after setting up BlueStacks for best results\n")
+        try:
+            raw_uploader = from_instagrapi_client(cl, proxy=proxy)
+        except Exception as e:
+            print(f"[!] Raw uploader init failed ({e}) — falling back to instagrapi\n")
+            raw_uploader = None
 
     # ─── Warm-up ────────────────────────────────────────────────
     if not args.skip_warmup:

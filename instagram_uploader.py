@@ -1,12 +1,15 @@
 """
 InstagramReelsUploader
 ======================
-Raw HTTP uploader using Instagram's private API with iOS fingerprint.
-Mirrors the fingerprint of a real iPhone running Instagram 261.x,
-which avoids the per-post suppression instagrapi triggers.
+Raw HTTP uploader using Instagram's private API with a real Android fingerprint.
+Credentials come from either:
+  1. BlueStacks token (best) — run extract_token.py after logging in via BlueStacks
+  2. instagrapi session fallback — uses token from API login (less trusted)
 
-Credentials are extracted from an instagrapi Client after login —
-no Burp Suite or patched IPA required for initial setup.
+The key difference from instagrapi's built-in upload:
+  - Real auth token from actual Instagram app (not reverse-engineered API login)
+  - Correct Android headers matching the token's origin device
+  - Proper rupload flow matching the official app
 """
 
 import json
@@ -19,23 +22,32 @@ import uuid as uuid_lib
 import requests
 
 
-# ─── iPhone fingerprint constants ─────────────────────────────────
-IG_APP_ID    = "124024574287414"   # Instagram iOS app ID (constant)
-IG_VERSION   = "261.1.0.56"
-IOS_DEVICE   = "iPhone13,2"        # iPhone 12
-IOS_VERSION  = "16_6"
-SCALE        = "3.00"
-RESOLUTION   = "1170x2532"
-BUILD_NUMBER = "422787551"
+# ─── Android fingerprint (Samsung Galaxy S24 Ultra) ───────────────
+# Matches the device profile in devices.py
+IG_APP_ID        = "567067343352427"   # Instagram Android app ID
+IG_VERSION       = "261.1.0.56"
+ANDROID_VERSION  = "34"
+ANDROID_RELEASE  = "14"
+MANUFACTURER     = "samsung"
+MODEL            = "SM-S928B"
+DEVICE           = "e3q"
+CPU              = "qcom"
+DPI              = "640dpi"
+RESOLUTION       = "1440x3120"
+VERSION_CODE     = "397823845"
 
 USER_AGENT = (
     f"Instagram {IG_VERSION} "
-    f"({IOS_DEVICE}; iOS {IOS_VERSION}; en_US; en-US; "
-    f"scale={SCALE}; {RESOLUTION}; {BUILD_NUMBER})"
+    f"Android ({ANDROID_VERSION}/{ANDROID_RELEASE}; "
+    f"{DPI}; {RESOLUTION}; {MANUFACTURER}; {MODEL}; "
+    f"{DEVICE}; {CPU}; en_US; {VERSION_CODE})"
 )
 
-# Delays (seconds) between configure retries while transcoder is running
+# Delays (seconds) between configure retries while transcoder runs
 TRANSCODER_RETRY_DELAYS = [30, 90, 270]
+
+# Path to BlueStacks token file written by extract_token.py
+_TOKEN_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "bluestacks_token.json")
 
 
 class InstagramReelsUploader:
@@ -69,15 +81,19 @@ class InstagramReelsUploader:
             else f"Bearer {auth_token}"
         )
 
+        android_id = f"android-{device_id[:16].replace('-','')[:16]}"
+
         self._session.headers.update({
             "Authorization":                bearer,
             "User-Agent":                   USER_AGENT,
             "Accept-Language":              "en-US",
             "Accept-Encoding":              "gzip, deflate",
             "X-Ig-App-Id":                 IG_APP_ID,
-            "X-Ig-Family-Device-Id":       device_id,
+            "X-Ig-Android-ID":             android_id,
             "X-Ig-Device-Id":              device_id,
-            "X-Ig-Connection-Type":        "WiFi",
+            "X-Ig-Family-Device-Id":       device_id,
+            "X-Ig-Connection-Type":        "WIFI",
+            "X-Ig-Capabilities":           "3brTvx0=",
             "X-Ig-App-Locale":             "en_US",
             "X-Ig-Device-Locale":          "en_US",
             "X-Ig-Mapped-Locale":          "en_US",
@@ -413,9 +429,67 @@ def from_instagrapi_client(cl, proxy: str = None) -> InstagramReelsUploader:
         print(f"  [uploader] Cookie copy warning (non-fatal): {e}")
 
     print(
-        f"  [uploader] Ready — "
+        f"  [uploader] Ready (instagrapi session) — "
         f"user={user_id[:5]}*** "
         f"device={device_id[:8]}*** "
         f"bloks={bloks_version[:12] if bloks_version else 'none'}..."
+    )
+    return uploader
+
+
+# ─── BlueStacks token loader (preferred) ─────────────────────────
+
+def from_bluestacks_token(proxy: str = None) -> InstagramReelsUploader | None:
+    """
+    Load credentials from bluestacks_token.json written by extract_token.py.
+    This gives a real Android auth token from an actual Instagram app login —
+    the highest quality fingerprint we can get without a physical device.
+
+    Returns None if the token file doesn't exist yet.
+    """
+    if not os.path.exists(_TOKEN_FILE):
+        return None
+
+    try:
+        with open(_TOKEN_FILE) as f:
+            tok = json.load(f)
+    except Exception as e:
+        print(f"  [uploader] Could not load bluestacks_token.json: {e}")
+        return None
+
+    session_id  = tok.get("sessionid", "")
+    user_id     = tok.get("ds_user_id", "")
+    device_id   = tok.get("phone_id") or tok.get("device_id") or str(uuid_lib.uuid4())
+    auth_token  = tok.get("auth_token", "")
+
+    if not auth_token:
+        if session_id and user_id:
+            # Build Bearer token from session cookie
+            import base64
+            raw = json.dumps({"ds_user_id": user_id, "sessionid": session_id})
+            auth_token = f"IGT:2:{base64.b64encode(raw.encode()).decode()}"
+        else:
+            print("  [uploader] bluestacks_token.json missing sessionid/ds_user_id")
+            return None
+
+    if not user_id:
+        print("  [uploader] bluestacks_token.json missing ds_user_id")
+        return None
+
+    uploader = InstagramReelsUploader(
+        auth_token  = auth_token,
+        user_id     = user_id,
+        device_id   = device_id,
+        proxy       = proxy,
+    )
+
+    # Set sessionid as cookie (critical for auth)
+    if session_id:
+        uploader._session.cookies.set("sessionid", session_id, domain=".instagram.com")
+
+    print(
+        f"  [uploader] Ready (BlueStacks token) — "
+        f"user={user_id[:5]}*** "
+        f"device={device_id[:8]}***"
     )
     return uploader
