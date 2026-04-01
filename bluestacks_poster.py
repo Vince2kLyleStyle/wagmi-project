@@ -289,24 +289,27 @@ def save_coords(coords: dict):
 
 def push_video_to_bluestacks(local_path: str) -> str:
     """
-    Push video file to BlueStacks gallery.
+    Push video file to BlueStacks DCIM/Camera — Instagram checks here first.
     Returns the remote path on the Android filesystem.
     """
-    filename  = os.path.basename(local_path)
-    remote    = f"/sdcard/Movies/{filename}"
+    filename = os.path.basename(local_path)
+    remote   = f"/sdcard/DCIM/Camera/{filename}"
 
-    print(f"  [push] {filename} → BlueStacks gallery...")
+    # Ensure the folder exists
+    adb(["shell", "mkdir", "-p", "/sdcard/DCIM/Camera"])
+
+    print(f"  [push] {filename} → BlueStacks...")
     out = adb(["push", local_path, remote], timeout=120)
     if "error" in out.lower():
         print(f"  [!!] Push failed: {out}")
         return ""
 
-    # Trigger media scanner so Instagram gallery sees the video
+    # Trigger media scanner so Instagram gallery sees the video immediately
     adb(["shell", "am", "broadcast",
          "-a", "android.intent.action.MEDIA_SCANNER_SCAN_FILE",
          "-d", f"file://{remote}"])
     time.sleep(AFTER_PUSH_SLEEP)
-    print(f"  [push] Done — media scanned")
+    print(f"  [push] Done")
     return remote
 
 
@@ -536,6 +539,7 @@ def main():
     parser = argparse.ArgumentParser(description="BlueStacks Instagram Poster")
     parser.add_argument("--calibrate",  action="store_true", help="Run coordinate calibration")
     parser.add_argument("--screenshot", action="store_true", help="Take a screenshot and exit")
+    parser.add_argument("--test",       action="store_true", help="Test ADB connection + screenshot, then exit")
     parser.add_argument("--once",       action="store_true", help="Post one video and exit")
     parser.add_argument("--dry-run",    action="store_true", help="Push video but skip UI taps")
     parser.add_argument("--daily-cap",  type=int, default=None, help="Max posts per day")
@@ -556,9 +560,24 @@ def main():
     w, h = get_screen_size()
     print(f"[+] Screen: {w}x{h}")
 
-    # Screenshot only
-    if args.screenshot:
-        screenshot()
+    # Test mode — verify ADB is working, take screenshot, dump UI, exit
+    if args.test or args.screenshot:
+        print("[*] Testing ADB connection...")
+        print(f"[+] Screen size: {w}x{h}")
+        screenshot("bluestacks_screen.png")
+        print("[*] Dumping UI elements...")
+        pos = find_element(text="Next")
+        if pos:
+            print(f"[+] Found 'Next' button at {pos} — uiautomator working")
+        else:
+            print("[~] 'Next' not visible (expected if not on that screen)")
+        packages = adb(["shell", "pm", "list", "packages", "com.instagram"])
+        if "com.instagram.android" in packages:
+            print("[+] Instagram is installed")
+        else:
+            print("[!!] Instagram not found — install it inside BlueStacks")
+        print("\n[+] Test complete. Check bluestacks_screen.png to see current screen.")
+        return
         return
 
     # Calibration mode

@@ -11,8 +11,8 @@ echo  ============================================================
 echo.
 echo  How do you want to post today?
 echo.
-echo    [1] BlueStacks poster (recommended — real app taps, undetectable)
-echo    [2] API poster (faster setup, instagrapi)
+echo    [1] BlueStacks poster (RECOMMENDED — real app taps, undetectable)
+echo    [2] API poster (instagrapi — faster but less human)
 echo.
 set /p MODE="  Enter 1 or 2: "
 echo.
@@ -48,12 +48,29 @@ echo.
 
 :: ── Step 5: Post ─────────────────────────────────────────────────
 if "%MODE%"=="1" (
-    echo  Starting BlueStacks poster...
-    echo  Make sure BlueStacks is open with Instagram logged in.
+    echo  ============================================================
+    echo   BlueStacks Poster
+    echo   Make sure BlueStacks is open with Instagram logged in.
+    echo  ============================================================
     echo.
+    echo  Testing ADB connection first...
+    py bluestacks_poster.py --test
+    if %ERRORLEVEL% NEQ 0 (
+        echo.
+        echo  [!!] ADB test failed.
+        echo       1. Open BlueStacks
+        echo       2. Settings ^> Advanced ^> Android Debug Bridge ^> ON
+        echo       3. Re-run this script
+        pause
+        exit /b 1
+    )
+    echo.
+    echo  ADB OK — starting poster...
     py bluestacks_poster.py
 ) else (
-    echo  Starting API poster...
+    echo  ============================================================
+    echo   API Poster
+    echo  ============================================================
     echo.
     py extract_token.py
     if %ERRORLEVEL% NEQ 0 (
