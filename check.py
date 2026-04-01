@@ -144,12 +144,16 @@ check(
     fix="Get free API hash from my.telegram.org/apps → add to .env"
 )
 
+# Telethon appends .session automatically — check for both
 session_path = os.path.join(
     os.path.dirname(__file__), "sessions", "tiktok_scraper.session"
 )
+session_path_alt = os.path.join(
+    os.path.dirname(__file__), "sessions", "tiktok_scraper"
+)
 check(
     "Telegram session saved (login done)",
-    os.path.exists(session_path),
+    os.path.exists(session_path) or os.path.exists(session_path_alt),
     fix="Run setup_once.bat to log in to Telegram (one time only)"
 )
 print()

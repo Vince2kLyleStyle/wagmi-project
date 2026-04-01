@@ -3,3 +3,4 @@ Pillow>=10.0.0
 python-dotenv>=1.0.0
 requests>=2.31.0
 telethon>=1.34.0
+pygetwindow>=0.0.9

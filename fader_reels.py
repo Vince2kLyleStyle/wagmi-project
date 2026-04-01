@@ -256,11 +256,15 @@ def apply_emoji_overlay(video_path: str) -> str | None:
     try:
         from PIL import Image, ImageDraw, ImageFont
 
-        # NotoColorEmoji is the only reliable emoji font on Linux
+        # Emoji font — Linux (NotoColorEmoji) or Windows (Segoe UI Emoji)
         emoji_font_paths = [
+            # Linux
             "/usr/share/fonts/truetype/noto/NotoColorEmoji.ttf",
             "/usr/share/fonts/noto/NotoColorEmoji.ttf",
             "/usr/share/fonts/truetype/noto-color-emoji/NotoColorEmoji.ttf",
+            # Windows
+            os.path.join(os.environ.get("WINDIR", "C:\\Windows"), "Fonts", "seguiemj.ttf"),
+            "C:\\Windows\\Fonts\\seguiemj.ttf",
         ]
         font = None
         for fp in emoji_font_paths:
