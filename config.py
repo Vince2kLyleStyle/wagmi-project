@@ -32,7 +32,7 @@ BATCH_SIZE = 3         # 3 videos per batch
 # These are VIRAL TRENDING TOPIC captions — not niche-specific.
 # The trick: broad trending topics push posts to explore, regardless of video content.
 # Rotate these so each post looks unique. Add new trending ones as you find them.
-# Pro tip: grab captions from @memeyahu @twinkpotato @womenconsumer posts that went viral.
+# Pro tip: grab captions from @twinkpotato @womenconsumer posts that went viral.
 VIRAL_CAPTIONS = [
     (
         "🇳🇱 Netherlands is transforming its cities into climate-resilient hubs!\n"

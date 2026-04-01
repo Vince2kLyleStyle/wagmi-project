@@ -40,7 +40,6 @@ from telegram_sender import send_and_download_sync
 # Reels from these accounts skip the high view threshold (trusted sources).
 # Add more usernames here anytime.
 COMPETITOR_ACCOUNTS = [
-    "memeyahu",
     "twinkpotato",
     "womenconsumer",
     "uncrustamemes",
