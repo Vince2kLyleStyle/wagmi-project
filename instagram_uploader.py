@@ -187,20 +187,21 @@ class InstagramReelsUploader:
         return True
 
     def _upload_thumbnail(self, thumb_path: str, upload_id: str) -> bool:
-        """Upload cover image via photo rupload."""
+        """Upload cover image via photo rupload using same upload_id as video."""
         with open(thumb_path, "rb") as fh:
             thumb_data = fh.read()
 
         size        = len(thumb_data)
-        entity_name = f"fb_uploader_{upload_id}"
+        rand        = random.randint(1000000000, 9999999999)
+        entity_name = f"{upload_id}_0_{rand}"
         url         = f"{self.base_url}/rupload_igphoto/{entity_name}"
 
         rupload_params = json.dumps({
             "retry_context":     '{"num_reupload":0,"num_step_auto_retry":0,"num_step_manual_retry":0}',
-            "media_type":        "2",
+            "media_type":        "1",
             "upload_id":         upload_id,
             "image_compression": json.dumps({
-                "lib_name": "moz", "lib_version": "3.1.m", "quality": "87"
+                "lib_name": "moz", "lib_version": "3.1.m", "quality": "80"
             }),
         })
 
@@ -284,8 +285,20 @@ class InstagramReelsUploader:
         except Exception:
             result = {"status": "error", "message": resp.text[:300]}
 
-        if resp.status_code != 200:
-            print(f"  [uploader] Configure failed {resp.status_code}: {result}")
+        # Map HTTP error codes to named statuses the main loop can act on
+        if resp.status_code == 429:
+            result["status"] = "THROTTLED"
+        elif resp.status_code in (401, 403):
+            result["status"] = "LOGIN_EXPIRED"
+        elif resp.status_code != 200:
+            # Check body for challenge / login signals
+            body_str = json.dumps(result).lower()
+            if "challenge" in body_str:
+                result["status"] = "CHALLENGE"
+            elif "login_required" in body_str or "not authorized" in body_str:
+                result["status"] = "LOGIN_EXPIRED"
+            else:
+                print(f"  [uploader] Configure failed {resp.status_code}: {result}")
 
         return result
 
