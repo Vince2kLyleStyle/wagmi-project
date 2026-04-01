@@ -138,6 +138,86 @@ def tap(x_pct: float, y_pct: float, w: int, h: int, label: str = ""):
     adb(["shell", "input", "tap", str(x), str(y)])
 
 
+def tap_absolute(x: int, y: int, label: str = ""):
+    """Tap at absolute Android coordinates."""
+    if label:
+        print(f"  [tap] {label} ({x}, {y})")
+    adb(["shell", "input", "tap", str(x), str(y)])
+
+
+def find_element(text: str = None, resource_id: str = None,
+                 content_desc: str = None) -> tuple[int, int] | None:
+    """
+    Use uiautomator dump to find a UI element by text, resource-id, or
+    content-desc. Returns the center (x, y) in Android coordinates, or None.
+
+    This is more reliable than fixed coordinates — works regardless of
+    screen size, window position, or DPI scaling.
+    """
+    import re
+    import xml.etree.ElementTree as ET
+
+    # Dump current UI hierarchy to sdcard
+    adb(["shell", "uiautomator", "dump", "/sdcard/ui_dump.xml"])
+    time.sleep(0.5)
+    adb(["pull", "/sdcard/ui_dump.xml", "ui_dump.xml"])
+    adb(["shell", "rm", "/sdcard/ui_dump.xml"])
+
+    if not os.path.exists("ui_dump.xml"):
+        return None
+
+    try:
+        tree = ET.parse("ui_dump.xml")
+        root = tree.getroot()
+
+        for node in root.iter("node"):
+            match = False
+            if text and node.get("text", "").lower() == text.lower():
+                match = True
+            if resource_id and resource_id in node.get("resource-id", ""):
+                match = True
+            if content_desc and content_desc.lower() in node.get("content-desc", "").lower():
+                match = True
+
+            if match:
+                bounds = node.get("bounds", "")
+                # bounds format: [left,top][right,bottom]
+                nums = re.findall(r"\d+", bounds)
+                if len(nums) == 4:
+                    cx = (int(nums[0]) + int(nums[2])) // 2
+                    cy = (int(nums[1]) + int(nums[3])) // 2
+                    return cx, cy
+    except Exception as e:
+        print(f"  [ui] uiautomator parse error: {e}")
+    finally:
+        try:
+            os.remove("ui_dump.xml")
+        except OSError:
+            pass
+
+    return None
+
+
+def tap_element(text: str = None, resource_id: str = None,
+                content_desc: str = None,
+                fallback_pct: list = None, w: int = 1080, h: int = 1920,
+                label: str = "") -> bool:
+    """
+    Tap a UI element found via uiautomator, with percentage fallback.
+    Returns True if tapped, False if not found and no fallback.
+    """
+    pos = find_element(text=text, resource_id=resource_id, content_desc=content_desc)
+    if pos:
+        tap_absolute(pos[0], pos[1], label or text or resource_id or "element")
+        return True
+    if fallback_pct:
+        print(f"  [ui] element not found, using fallback coords for {label or text}")
+        tap(fallback_pct[0], fallback_pct[1], w, h, label or text or "fallback")
+        return True
+    print(f"  [!!] Could not find element: text={text} id={resource_id}")
+    return False
+
+
 def swipe(x1_pct, y1_pct, x2_pct, y2_pct, w, h, duration_ms=300):
     """Swipe between two fractional coordinates."""
     x1, y1 = int(w * x1_pct), int(h * y1_pct)
@@ -257,7 +337,17 @@ def post_reel(
     Returns True on likely success, False on failure.
     """
     def t(key, label=""):
+        """Tap by saved coords (fallback path)."""
         tap(coords[key][0], coords[key][1], w, h, label or key)
+
+    def smart_tap(text=None, resource_id=None, content_desc=None,
+                  fallback_key=None, label=""):
+        """Try uiautomator first, fall back to saved coords."""
+        fb = coords.get(fallback_key) if fallback_key else None
+        return tap_element(
+            text=text, resource_id=resource_id, content_desc=content_desc,
+            fallback_pct=fb, w=w, h=h, label=label
+        )
 
     filename = os.path.basename(video_path)
     print(f"\n{'─'*54}")
@@ -277,37 +367,48 @@ def post_reel(
     launch_instagram()
 
     # ── Step 3: Tap "+" to open post creation ────────────────────
-    t("plus_button", "open create menu")
+    smart_tap(content_desc="New post", resource_id="feed_tab_icon_new_post",
+              fallback_key="plus_button", label="open create menu")
     human_delay(2.0)
 
     # ── Step 4: Tap "REEL" tab ────────────────────────────────────
-    t("reel_tab", "select Reel tab")
+    smart_tap(text="REEL", resource_id="clips_tab",
+              fallback_key="reel_tab", label="select Reel tab")
     human_delay(1.5)
 
     # ── Step 5: Select most recent video (first in gallery) ───────
-    t("first_video", "select video")
+    # Tap the first thumbnail in the gallery grid
+    smart_tap(resource_id="gallery_recycler_view",
+              fallback_key="first_video", label="open gallery")
+    human_delay(1.0)
+    # If gallery opened, tap first item
+    t("first_video", "select first video")
     human_delay(2.0)
 
     # ── Step 6: Tap Next (moves to trim/edit screen) ──────────────
-    t("next_button", "Next (to edit screen)")
+    smart_tap(text="Next", content_desc="Next",
+              fallback_key="next_button", label="Next (to edit)")
     human_delay(2.5)
 
     # ── Step 7: Tap Next again (skip editing, go to caption) ──────
-    t("next_button", "Next (to caption screen)")
+    smart_tap(text="Next", content_desc="Next",
+              fallback_key="next_button", label="Next (to caption)")
     human_delay(2.0)
 
     # ── Step 8: Add caption ───────────────────────────────────────
     if caption:
-        t("caption_field", "tap caption field")
+        smart_tap(text="Write a caption...", resource_id="caption",
+                  content_desc="Write a caption",
+                  fallback_key="caption_field", label="caption field")
         human_delay(0.8)
         input_text_adb(caption)
         human_delay(0.5)
-        # Dismiss keyboard
-        adb(["shell", "input", "keyevent", "111"])  # KEYCODE_ESCAPE
+        adb(["shell", "input", "keyevent", "111"])  # dismiss keyboard
         human_delay(0.5)
 
     # ── Step 9: Tap Share/Post ────────────────────────────────────
-    t("share_button", "Share (post Reel)")
+    smart_tap(text="Share", content_desc="Share",
+              fallback_key="share_button", label="Share (post Reel)")
     human_delay(1.0)
 
     # ── Step 10: Wait for upload ──────────────────────────────────
