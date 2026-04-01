@@ -11,40 +11,48 @@ echo  ============================================================
 echo.
 
 :: ── Step 1: Pull latest code ────────────────────────────────────
-echo  [1/4] Pulling latest code...
+echo  [1/5] Pulling latest code...
 git pull origin claude/tiktok-scraper-tool-hXD41
 echo.
 
-:: ── Step 2: Extract BlueStacks token ────────────────────────────
-echo  [2/4] Extracting BlueStacks token (Instagram real device auth)...
-echo        Make sure BlueStacks is open + Instagram is logged in.
+:: ── Step 2: Install/update packages ─────────────────────────────
+echo  [2/5] Checking packages...
+pip install -r requirements.txt -q
+echo  Packages OK.
+echo.
+
+:: ── Step 3: Pre-flight check ─────────────────────────────────────
+echo  [3/5] Running pre-flight check...
+echo.
+py check.py
+if %ERRORLEVEL% NEQ 0 (
+    echo.
+    echo  [!!] Pre-flight check failed. Fix the issues above and re-run.
+    pause
+    exit /b 1
+)
+echo.
+
+:: ── Step 4: Extract BlueStacks token (optional) ──────────────────
+echo  [4/5] Trying BlueStacks token extraction...
+echo        (Skip this step with Ctrl+C if BlueStacks is not set up yet)
 echo.
 py extract_token.py
 if %ERRORLEVEL% NEQ 0 (
     echo.
-    echo  [!] BlueStacks token extraction failed.
-    echo  [!] Continuing without it — will use instagrapi session instead.
-    echo      To fix: open BlueStacks, log into Instagram, enable ADB, re-run.
+    echo  [~] No BlueStacks token — continuing with instagrapi session.
     echo.
-    timeout /t 3 /nobreak >nul
+    timeout /t 2 /nobreak >nul
 )
 echo.
 
-:: ── Step 3: Scrape content ───────────────────────────────────────
-echo  [3/4] Scraping Instagram Reels via Telegram bot...
-echo        This downloads 200 videos to tiktok_videos\motion\
-echo        Press Ctrl+C to skip scraping and go straight to posting.
+:: ── Step 5: Scrape + Post ────────────────────────────────────────
+echo  [5/5] Starting scraper + poster...
 echo.
+echo  --- SCRAPING (accounts + hashtags) ---
 py instagram_scraper.py --amount 200
 echo.
-echo  [3/4] Scrape complete.
-echo.
-
-:: ── Step 4: Run the poster ───────────────────────────────────────
-echo  [4/4] Starting Fader v2 poster (@dumbmoneyonsolana)...
-echo        Posting from tiktok_videos\motion\
-echo        Press Ctrl+C to stop at any time.
-echo.
+echo  --- POSTING ---
 py fader_reels.py
 
 echo.
