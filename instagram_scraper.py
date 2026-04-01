@@ -2,8 +2,10 @@
 """
 Instagram Reel Scraper
 ======================
-Scrapes trending Reels by hashtag and downloads them directly via instagrapi.
-No Telegram bot, no Playwright — just Instagram's own API browsing.
+Scrapes trending Reels by hashtag via instagrapi, then routes each video
+URL through the Telegram download bot to get a clean, watermark-free file.
+
+Flow: browse hashtags → filter → send URL to Telegram bot → save file
 
 Content scraped from Instagram is already proven to work on Instagram.
 
@@ -11,6 +13,7 @@ Usage:
     python instagram_scraper.py                      # scrape motion niche (default)
     python instagram_scraper.py --amount 100         # grab more videos
     python instagram_scraper.py --min-views 300000   # lower view threshold
+    python instagram_scraper.py --no-telegram        # direct download (no Telegram)
 """
 
 import argparse
@@ -30,6 +33,8 @@ from instagrapi.exceptions import (
 )
 
 import config
+import scraper_config as tg_cfg
+from telegram_sender import send_and_download_sync
 
 # ─── Hashtags for the motion niche ────────────────────────────────
 # Mix of high-volume and niche-specific tags
@@ -150,23 +155,41 @@ def passes_filters(media, min_views: int, seen_ids: set) -> tuple[bool, str]:
     return True, ""
 
 
-def download_reel(cl: Client, media, download_dir: str) -> str | None:
-    """Download reel to folder. Returns local file path or None."""
+def reel_url(media) -> str:
+    """Build the public Instagram Reel URL from media object."""
+    code = getattr(media, "code", None) or str(media.pk)
+    return f"https://www.instagram.com/reel/{code}/"
+
+
+def download_via_telegram(url: str, download_dir: str) -> bool:
+    """Send URL to Telegram bot, wait for video reply, save file. Returns True on success."""
+    os.makedirs(download_dir, exist_ok=True)
+    sent, downloaded, failed = send_and_download_sync(
+        [url],
+        bot_username=tg_cfg.TELEGRAM_BOT_USERNAME,
+        download_dir=download_dir,
+    )
+    return downloaded == 1
+
+
+def download_reel_direct(cl: Client, media, download_dir: str) -> str | None:
+    """Fallback: download directly via instagrapi (may have watermark metadata)."""
     os.makedirs(download_dir, exist_ok=True)
     try:
         path = cl.video_download(media.pk, folder=download_dir)
         return str(path)
     except Exception as e:
-        print(f"  [scraper] Download failed for {media.pk}: {e}")
+        print(f"  [scraper] Direct download failed for {media.pk}: {e}")
         return None
 
 
 def main():
     parser = argparse.ArgumentParser(description="Scrape Instagram Reels for the motion niche")
-    parser.add_argument("--amount",    type=int,   default=200,       help="Target number of videos to download")
-    parser.add_argument("--min-views", type=int,   default=MIN_VIEWS, help=f"Min view count (default: {MIN_VIEWS:,})")
-    parser.add_argument("--hashtags",  nargs="+",  default=None,      help="Custom hashtags (without #)")
-    parser.add_argument("--dry-run",   action="store_true",           help="Find videos but don't download")
+    parser.add_argument("--amount",       type=int,  default=200,       help="Target number of videos to download")
+    parser.add_argument("--min-views",    type=int,  default=MIN_VIEWS, help=f"Min view count (default: {MIN_VIEWS:,})")
+    parser.add_argument("--hashtags",     nargs="+", default=None,      help="Custom hashtags (without #)")
+    parser.add_argument("--dry-run",      action="store_true",          help="Find videos but don't download")
+    parser.add_argument("--no-telegram",  action="store_true",          help="Skip Telegram — download directly via instagrapi")
     args = parser.parse_args()
 
     print("""
@@ -183,10 +206,13 @@ def main():
     downloaded = 0
     checked    = 0
 
+    use_telegram = not args.no_telegram
+
     print(f"  Target:    {target} videos")
     print(f"  Min views: {min_views:,}")
     print(f"  Max dur:   {MAX_DURATION}s")
     print(f"  Hashtags:  {len(hashtags)}")
+    print(f"  Download:  {'Telegram bot (@' + tg_cfg.TELEGRAM_BOT_USERNAME + ')' if use_telegram else 'direct (instagrapi)'}")
     print(f"  Already have: {len(seen_ids)} videos")
     print(f"  Save to:   {DOWNLOAD_DIR}\n")
 
@@ -240,14 +266,22 @@ def main():
                 tag_downloaded += 1
                 continue
 
-            path = download_reel(cl, media, DOWNLOAD_DIR)
-            if path:
+            success = False
+            if use_telegram:
+                url = reel_url(media)
+                print(f"         sending to Telegram: {url}")
+                success = download_via_telegram(url, DOWNLOAD_DIR)
+            else:
+                path = download_reel_direct(cl, media, DOWNLOAD_DIR)
+                success = path is not None
+                if success:
+                    print(f"         saved: {os.path.basename(path)}")
+
+            if success:
                 mark_seen(pk)
                 seen_ids.add(pk)
                 downloaded += 1
                 tag_downloaded += 1
-                print(f"         saved: {os.path.basename(path)}")
-
                 # Human-like pause between downloads
                 time.sleep(random.uniform(2, 5))
             else:

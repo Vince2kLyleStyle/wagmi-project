@@ -95,15 +95,19 @@ async def create_client():
 
 
 def _sanitize_filename(url):
-    """Extract a clean filename from a TikTok URL."""
+    """Extract a clean filename from a TikTok or Instagram URL."""
+    # TikTok: @user/video/12345
     match = re.search(r"@([^/]+)/video/(\d+)", url)
     if match:
         return f"{match.group(1)}_{match.group(2)}.mp4"
-    # Fallback: use video ID from URL
     match = re.search(r"/video/(\d+)", url)
     if match:
         return f"tiktok_{match.group(1)}.mp4"
-    return f"tiktok_{hash(url) & 0xFFFFFFFF:08x}.mp4"
+    # Instagram: /reel/SHORTCODE/ or /p/SHORTCODE/
+    match = re.search(r"instagram\.com/(?:reel|p)/([A-Za-z0-9_-]+)", url)
+    if match:
+        return f"ig_{match.group(1)}.mp4"
+    return f"video_{hash(url) & 0xFFFFFFFF:08x}.mp4"
 
 
 async def _wait_for_video(client, bot_entity, timeout):
