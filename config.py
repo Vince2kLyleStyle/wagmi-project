@@ -24,9 +24,9 @@ PROXY = os.getenv("IG_PROXY", "")
 VIDEO_DIR = os.path.join(os.path.dirname(__file__), "tiktok_videos", os.getenv("NICHE", "motion"))
 
 # ─── Posting Limits ────────────────────────────────────────────────
-DAILY_MIN = 96         # ~2-3 per 30 min over 24h
-DAILY_MAX = 144        # ~3 per 30 min over 24h
-BATCH_SIZE = 3         # videos per mini-batch (2-3 posts per batch)
+DAILY_MIN = 96         # 3 posts per 30 min × 16 active hours
+DAILY_MAX = 96         # fixed — exactly 3 every 30 min
+BATCH_SIZE = 3         # 3 videos per batch
 
 # ─── Caption ──────────────────────────────────────────────────────
 # Proven algorithm captions — these are what grab the IG algorithm.
@@ -96,11 +96,11 @@ PRUNE_INTERVAL_BATCHES = 4
 INTRA_BATCH_MIN = 20
 INTRA_BATCH_MAX = 60
 
-# Between batches (~30 min with jitter → 2-3 posts per 30 min)
+# Between batches — 3 posts every 30 min with slight jitter
 INTER_BATCH_CENTER = 1800    # 30 min center
-INTER_BATCH_SPREAD = 180     # +/- 3 min std-dev
-INTER_BATCH_FLOOR = 1500     # never less than 25 min
-INTER_BATCH_CEIL = 2100      # never more than 35 min
+INTER_BATCH_SPREAD = 90      # slight jitter: ±1.5 min std-dev
+INTER_BATCH_FLOOR = 1680     # never less than 28 min
+INTER_BATCH_CEIL  = 1920     # never more than 32 min
 
 # ─── Throttle / Error Handling ─────────────────────────────────────
 THROTTLE_SLEEP_MIN = 1800    # 30 min

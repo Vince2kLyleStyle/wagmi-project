@@ -50,8 +50,8 @@ AFTER_PUSH_SLEEP     = 3      # seconds after adb push before opening IG
 AFTER_LAUNCH_SLEEP   = 4      # seconds after opening Instagram
 AFTER_TAP_SLEEP      = 1.5   # default between taps
 UPLOAD_WAIT          = 45     # seconds to wait for upload to complete
-POST_INTERVAL_MIN    = 1500   # 25 min min between posts
-POST_INTERVAL_MAX    = 2100   # 35 min max between posts
+POST_INTERVAL_MIN    = 1680   # 28 min — slight jitter floor
+POST_INTERVAL_MAX    = 1920   # 32 min — slight jitter ceiling
 
 # ─── Default coordinates (BlueStacks 4, 1080x1920 portrait) ───────
 # All values are 0.0-1.0 fractions of screen width/height.
