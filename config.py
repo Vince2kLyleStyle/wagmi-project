@@ -85,23 +85,11 @@ PIN_COMMENTS = [
     "This is motion. Follow for more 🔥",
 ]
 
-# ─── Auto-Prune Dead Posts ───────────────────────────────────────────
-# After every N batches, fetch recent posts and delete any with < MIN_VIEWS
-# that are older than GRACE_MINUTES (to let new posts warm up first).
-PRUNE_ENABLED = False    # DISABLED — instagrapi view counts unreliable
-PRUNE_INTERVAL_BATCHES = 4     # run prune every 4 batches (~2 hrs)
-PRUNE_MIN_VIEWS = 10           # delete posts with fewer than this many views
-PRUNE_GRACE_MINUTES = 180      # 3 hours — gives slow cookers time to pop
-
-# ─── Surge Mode ──────────────────────────────────────────────────────
-# When any recent post crosses SURGE_THRESHOLD views, cut inter-batch delay
-# in half to flood the algorithm while we already have momentum.
-# Surge stays active until the next check cycle finds no viral posts.
-SURGE_ENABLED = False    # DISABLED — depends on same unreliable view counts
-SURGE_THRESHOLD = 10_000       # views needed to trigger surge
-SURGE_INTER_BATCH_CENTER = 900  # 15 min between batches (vs normal 30)
-SURGE_INTER_BATCH_FLOOR = 750   # never less than 12.5 min
-SURGE_INTER_BATCH_CEIL = 1050   # never more than 17.5 min
+# ─── Auto-Prune / Surge — PERMANENTLY DISABLED ───────────────────────
+# DO NOT RE-ENABLE. instagrapi view counts return 0 even on viral posts.
+# Auto-prune deleted a 4M view post and 2 days of content. Never again.
+# The check_and_prune() function is now a permanent no-op in fader_reels.py.
+PRUNE_INTERVAL_BATCHES = 4
 
 # ─── Timing (seconds) ──────────────────────────────────────────────
 # Between videos in a batch

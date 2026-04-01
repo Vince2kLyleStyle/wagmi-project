@@ -478,66 +478,13 @@ def upload_reel(cl: Client, video_path: str, raw_uploader=None) -> str | None:
 
 def check_and_prune(cl: Client) -> bool:
     """
-    Fetch recent reels, delete dead posts, and check for viral momentum.
-    Returns True if surge mode should be active (a post crossed SURGE_THRESHOLD).
+    DELETION PERMANENTLY DISABLED.
+    We lost a 4M view post and multiple days of content to auto-prune.
+    instagrapi view counts are unreliable (returns 0 even on viral posts).
+    This function will NEVER delete posts regardless of config.
+    Returns False always (surge mode permanently off too).
     """
-    min_views = getattr(config, "PRUNE_MIN_VIEWS", 10)
-    grace_minutes = getattr(config, "PRUNE_GRACE_MINUTES", 180)
-    surge_threshold = getattr(config, "SURGE_THRESHOLD", 10_000)
-    surge_enabled = getattr(config, "SURGE_ENABLED", False)
-    prune_enabled = getattr(config, "PRUNE_ENABLED", False)
-    grace_cutoff = datetime.now(timezone.utc) - timedelta(minutes=grace_minutes)
-
-    print(f"\n  [check] Scanning recent posts...")
-
-    try:
-        medias = cl.user_medias(cl.user_id, amount=50)
-    except Exception as e:
-        print(f"  [check] Could not fetch posts: {e}")
-        return False
-
-    deleted = 0
-    skipped_grace = 0
-    surge_active = False
-
-    for media in medias:
-        try:
-            media_type = getattr(media, "media_type", None)
-            product_type = getattr(media, "product_type", "")
-            if media_type not in (2,) and product_type != "clips":
-                continue
-
-            taken_at = getattr(media, "taken_at", None)
-            if taken_at is None:
-                continue
-            if taken_at.tzinfo is None:
-                taken_at = taken_at.replace(tzinfo=timezone.utc)
-
-            views = getattr(media, "view_count", None) or getattr(media, "video_view_count", 0) or 0
-
-            # Surge check — any post going viral?
-            if surge_enabled and views >= surge_threshold:
-                print(f"  [SURGE] Post {media.pk} has {views:,} views — SURGE MODE ON")
-                surge_active = True
-
-            # Skip grace period for pruning
-            if taken_at > grace_cutoff:
-                skipped_grace += 1
-                continue
-
-            # Prune dead posts
-            if prune_enabled and views < min_views:
-                cl.media_delete(str(media.pk))
-                print(f"  [prune] Deleted {media.pk} ({views} views)")
-                deleted += 1
-                time.sleep(random.uniform(2, 4))
-
-        except Exception as e:
-            print(f"  [check] Error on media {getattr(media, 'pk', '?')}: {e}")
-            continue
-
-    print(f"  [check] Done — deleted {deleted}, skipped {skipped_grace} in grace | surge={'ON' if surge_active else 'off'}\n")
-    return surge_active
+    return False
 
 
 def log_success(filename: str, media_id: str) -> None:
