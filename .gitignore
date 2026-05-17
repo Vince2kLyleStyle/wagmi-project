@@ -2,6 +2,7 @@
 accounts.json
 sessions/
 *.session
+.env
 
 # Downloaded videos
 tiktok_videos/
@@ -9,11 +10,28 @@ tiktok_videos/
 # Browser profile (contains cookies)
 tiktok_browser_profile/
 
-# Logs
+# Logs & debug files
 success.txt
 scraped_urls.txt
+*.log
+*.log.*
+*.png
+*.jpg
+*.xml
+*.txt
+_*.png
+debug_*.png
 
 # Python
 __pycache__/
 *.pyc
-.env
+*.pyo
+*.bak
+
+# ADB & emulator
+*.apk
+.caption_idx
+previews/
+
+# Claude Code
+.claude/
