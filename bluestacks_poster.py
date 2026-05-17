@@ -6,21 +6,18 @@ using ADB tap/swipe commands. No API calls whatsoever.
 Instagram sees a real Android device doing normal human taps.
 
 Flow per post:
-  1. Push video to BlueStacks /sdcard/Movies/ via adb push
+  1. Push video to BlueStacks via adb (two-step: /data/local/tmp then cp)
   2. Trigger media scanner so Instagram gallery sees it
   3. Launch Instagram
-  4. Navigate: + → Reel → select video → Next → Next → caption → Share
+  4. Navigate: + → REEL tab → select video → Next → dismiss popups → caption → Share
   5. Wait for upload confirmation
   6. Log success, delete local file
   7. Wait human-like delay, repeat
 
 Requirements:
-  - BlueStacks 4 open, Instagram logged into bot account
+  - BlueStacks 5 open, Instagram logged into bot account
   - ADB enabled: BlueStacks Settings > Advanced > Android Debug Bridge > ON
   - adb.exe on Windows PATH (C:\\platform-tools\\)
-
-First run — calibrate screen coordinates:
-  python bluestacks_poster.py --calibrate
 
 Normal run:
   python bluestacks_poster.py
@@ -33,15 +30,18 @@ import glob
 import json
 import os
 import random
+import re
 import subprocess
 import sys
 import time
 from datetime import datetime
 
+import captions as caption_gen
 import config
+from video_processor import process_video
 
 # ─── Paths ────────────────────────────────────────────────────────
-VIDEO_DIR    = os.path.join(os.path.dirname(__file__), "tiktok_videos", "motion")
+VIDEO_DIR    = config.VIDEO_DIR
 SUCCESS_LOG  = config.SUCCESS_LOG
 COORDS_FILE  = os.path.join(os.path.dirname(__file__), "bluestacks_coords.json")
 
@@ -49,63 +49,104 @@ COORDS_FILE  = os.path.join(os.path.dirname(__file__), "bluestacks_coords.json")
 AFTER_PUSH_SLEEP     = 3      # seconds after adb push before opening IG
 AFTER_LAUNCH_SLEEP   = 4      # seconds after opening Instagram
 AFTER_TAP_SLEEP      = 1.5   # default between taps
-UPLOAD_WAIT          = 45     # seconds to wait for upload to complete
+UPLOAD_WAIT          = 60     # seconds to wait for upload to complete (re-encoded files need more time)
 POST_INTERVAL_MIN    = 1680   # 28 min — slight jitter floor
 POST_INTERVAL_MAX    = 1920   # 32 min — slight jitter ceiling
 
-# ─── Default coordinates (BlueStacks 4, 1080x1920 portrait) ───────
-# All values are 0.0-1.0 fractions of screen width/height.
-# Run --calibrate to update these for your specific setup.
+# ─── Default coordinates (BlueStacks 5, 1080x1920 portrait) ───────
+# Calibrated via uiautomator dump on 2026-04-04.
+# All values are absolute pixel coords for 1080x1920 screen.
 DEFAULT_COORDS = {
-    # Bottom nav "+" button (create post)
-    "plus_button":         [0.50, 0.965],
-    # "REEL" tab on the creation screen
-    "reel_tab":            [0.75, 0.54],
-    # First video thumbnail in the gallery grid (top-left cell)
-    "first_video":         [0.17, 0.72],
-    # "Next" button (top-right corner, appears on multiple screens)
-    "next_button":         [0.88, 0.055],
-    # Caption text field
-    "caption_field":       [0.50, 0.35],
-    # "Share" / "Post" button (top-right on final screen)
-    "share_button":        [0.88, 0.055],
-    # "OK" on any confirmation dialog
-    "ok_button":           [0.65, 0.55],
+    # "+" button — top-left of home screen (content-desc="Create a reel")
+    "plus_button":         [48, 113],
+    # "REEL" tab on the creation screen (POST/STORY/REEL/LIVE bottom tabs)
+    "reel_tab":            [539, 1860],
+    # First video thumbnail in gallery grid (center of second cell, after Camera)
+    "first_video":         [540, 648],
+    # "Next" button — edit screen (bottom-right purple button)
+    "next_button_edit":    [982, 1876],
+    # "Share" button — caption/share screen (bottom-right blue button)
+    # NOTE: "Save draft" is at ~(210, 1890) — DO NOT hit that!
+    "next_button_share":   [610, 1890],
+    # Caption text field ("Write a caption and add hashtags...")
+    "caption_field":       [540, 605],
+    # "OK" on any confirmation dialog (popups like "New ways to reuse")
+    "ok_button":           [540, 1701],
 }
 
 
 # ─── ADB helpers ──────────────────────────────────────────────────
 
+ADB_SERIAL = None  # Set after connect_bluestacks() picks a device
+_adb_consecutive_timeouts = 0  # Track consecutive ADB failures
+
 def adb(cmd: list, timeout: int = 30) -> str:
     """Run an adb command. Returns stdout. Exits on connection failure."""
+    global _adb_consecutive_timeouts
     try:
+        prefix = ["adb"]
+        if ADB_SERIAL:
+            prefix = ["adb", "-s", ADB_SERIAL]
+        # MSYS_NO_PATHCONV prevents Git Bash from mangling /sdcard/ paths
+        env = os.environ.copy()
+        env["MSYS_NO_PATHCONV"] = "1"
         result = subprocess.run(
-            ["adb"] + cmd,
+            prefix + cmd,
             capture_output=True, text=True, timeout=timeout,
+            env=env,
         )
+        _adb_consecutive_timeouts = 0  # Reset on success
         return result.stdout.strip()
     except FileNotFoundError:
-        print("[!!] adb not found — add C:\\platform-tools\\ to Windows PATH")
+        print("[!!] adb not found -- add C:\\platform-tools\\ to Windows PATH")
         sys.exit(1)
     except subprocess.TimeoutExpired:
-        print(f"[!!] ADB command timed out: {' '.join(cmd)}")
+        _adb_consecutive_timeouts += 1
+        print(f"[!!] ADB command timed out ({_adb_consecutive_timeouts}x): {' '.join(cmd)}")
         return ""
     except Exception as e:
         print(f"[!!] ADB error: {e}")
-        return ""
+
+
+def adb_is_healthy() -> bool:
+    """Check if ADB is responsive. Returns False after 3+ consecutive timeouts."""
+    if _adb_consecutive_timeouts >= 3:
+        return False
+    return True
 
 
 def connect_bluestacks() -> bool:
-    """Auto-connect to BlueStacks on common ports."""
-    # Check if already connected
-    devices = adb(["devices"])
-    if len([l for l in devices.splitlines() if "\tdevice" in l]) > 0:
-        return True
+    """Auto-connect to BlueStacks on common ports. Sets ADB_SERIAL."""
+    global ADB_SERIAL
 
+    # Check already-connected devices first
+    result = subprocess.run(["adb", "devices"], capture_output=True, text=True, timeout=10)
+    lines = [l for l in result.stdout.splitlines() if "\tdevice" in l]
+
+    # Prefer 127.0.0.1:PORT (BlueStacks), fall back to emulator-*
+    for line in lines:
+        serial = line.split("\t")[0]
+        if serial.startswith("127.0.0.1"):
+            ADB_SERIAL = serial
+            print(f"[+] Using device: {ADB_SERIAL}")
+            return True
+
+    for line in lines:
+        serial = line.split("\t")[0]
+        if serial.startswith("emulator"):
+            ADB_SERIAL = serial
+            print(f"[+] Using device: {ADB_SERIAL}")
+            return True
+
+    # Try connecting on common BlueStacks ports
     print("[*] Connecting to BlueStacks...")
     for port in [5555, 5556, 5565, 5575]:
-        out = adb(["connect", f"127.0.0.1:{port}"])
+        out = subprocess.run(
+            ["adb", "connect", f"127.0.0.1:{port}"],
+            capture_output=True, text=True, timeout=10
+        ).stdout
         if "connected" in out.lower():
+            ADB_SERIAL = f"127.0.0.1:{port}"
             print(f"[+] Connected on port {port}")
             time.sleep(2)
             return True
@@ -117,16 +158,34 @@ def connect_bluestacks() -> bool:
 
 
 def get_screen_size() -> tuple[int, int]:
-    """Get BlueStacks screen dimensions."""
+    """Get BlueStacks screen dimensions (prefers override size)."""
     out = adb(["shell", "wm", "size"])
-    # Output: "Physical size: 1080x1920"
+    # Output may have both "Physical size: 1920x1080" and "Override size: 1080x1920"
+    # Prefer override (our portrait setting) over physical
     try:
-        size_str = out.split(":")[-1].strip()
-        w, h = size_str.split("x")
-        return int(w), int(h)
+        for line in reversed(out.splitlines()):
+            if ":" in line:
+                size_str = line.split(":")[-1].strip()
+                w, h = size_str.split("x")
+                return int(w), int(h)
     except Exception:
-        print("[~] Could not detect screen size, defaulting to 1080x1920")
-        return 1080, 1920
+        pass
+    print("[~] Could not detect screen size, defaulting to 1080x1920")
+    return 1080, 1920
+
+
+def ensure_portrait():
+    """Set BlueStacks to portrait mode (1080x1920) if it isn't already."""
+    w, h = get_screen_size()
+    if w > h:
+        print(f"[*] Screen is landscape ({w}x{h}), switching to portrait...")
+        adb(["shell", "settings", "put", "system", "user_rotation", "0"])
+        adb(["shell", "settings", "put", "system", "accelerometer_rotation", "0"])
+        adb(["shell", "wm", "size", "1080x1920"])
+        time.sleep(3)
+        w, h = get_screen_size()
+        print(f"[+] Screen now: {w}x{h}")
+    return w, h
 
 
 def tap(x_pct: float, y_pct: float, w: int, h: int, label: str = ""):
@@ -157,11 +216,13 @@ def find_element(text: str = None, resource_id: str = None,
     import re
     import xml.etree.ElementTree as ET
 
-    # Dump current UI hierarchy to sdcard
-    adb(["shell", "uiautomator", "dump", "/sdcard/ui_dump.xml"])
+    # Dump current UI hierarchy to sdcard with a short timeout — dumps
+    # can hang indefinitely if Android is in a weird state, which would
+    # wedge the entire poster loop. 15s is plenty for a real dump.
+    adb(["shell", "uiautomator", "dump", "/sdcard/ui_dump.xml"], timeout=15)
     time.sleep(0.5)
-    adb(["pull", "/sdcard/ui_dump.xml", "ui_dump.xml"])
-    adb(["shell", "rm", "/sdcard/ui_dump.xml"])
+    adb(["pull", "/sdcard/ui_dump.xml", "ui_dump.xml"], timeout=10)
+    adb(["shell", "rm", "/sdcard/ui_dump.xml"], timeout=5)
 
     if not os.path.exists("ui_dump.xml"):
         return None
@@ -240,31 +301,155 @@ def screenshot(save_as: str = "bluestacks_screen.png"):
     print(f"[*] Screenshot saved: {save_as}")
 
 
+def paste_unicode_text(text: str) -> bool:
+    """Paste Unicode text into the focused field via Windows clipboard + ADB PASTE.
+
+    Works with emojis and any Unicode. BlueStacks auto-syncs the Windows
+    clipboard to the Android clipboard, so Set-Clipboard on the host side
+    makes the text available to the device. `adb shell input keyevent 279`
+    (KEYCODE_PASTE) pastes at the current cursor position without needing
+    PowerShell SendKeys (which would steal BlueStacks focus and pause
+    the renderer). Caller must ensure the caption field is focused first.
+
+    Retries once if the first paste leaves the caption field empty.
+    Returns True if paste appeared successful, False otherwise.
+    """
+    if not text:
+        return False
+    caption_file = os.path.join(os.path.dirname(__file__), "_caption_tmp.txt")
+    try:
+        # Write caption bytes-for-bytes as UTF-8 with BOM so PowerShell
+        # reads it unambiguously even on older systems that default to
+        # ASCII/cp1252.
+        with open(caption_file, "wb") as f:
+            f.write(b"\xef\xbb\xbf" + text.encode("utf-8"))
+        # `Get-Content -Raw -Encoding UTF8` handles newlines, emojis, all
+        # Unicode correctly. BOM tells PowerShell to use UTF8.
+        ps_cmd = (
+            f"[Console]::OutputEncoding = [System.Text.Encoding]::UTF8; "
+            f"$t = [IO.File]::ReadAllText('{caption_file}', "
+            f"[System.Text.Encoding]::UTF8); "
+            f"if ($t.Length -gt 0 -and $t[0] -eq [char]0xFEFF) {{ $t = $t.Substring(1) }}; "
+            f"Set-Clipboard -Value $t"
+        )
+        subprocess.run(
+            ["powershell", "-NoProfile", "-Command", ps_cmd],
+            capture_output=True, timeout=10
+        )
+    except Exception as e:
+        print(f"  [!!] Could not set clipboard: {e}")
+        return False
+    finally:
+        try:
+            os.remove(caption_file)
+        except OSError:
+            pass
+
+    # BlueStacks syncs Windows → Android clipboard on a polling cycle.
+    # 0.5s is sometimes too fast; 1.5s is reliable.
+    time.sleep(1.5)
+
+    # KEYCODE_PASTE = 279 — pastes clipboard into focused field.
+    adb(["shell", "input", "keyevent", "279"], timeout=5)
+    time.sleep(1.5)
+
+    # Verify: dump UI and check the caption field actually contains text.
+    # IG shows the placeholder "Write a caption and add hashtags…" when
+    # the field is empty. If we still see that, the paste didn't land.
+    placeholder_still_there = find_element(text="Write a caption and add hashtags\u2026") is not None
+    if placeholder_still_there:
+        print(f"  [caption] Empty after paste — retrying in 2s")
+        time.sleep(2)
+        adb(["shell", "input", "keyevent", "279"], timeout=5)
+        time.sleep(1.5)
+        placeholder_still_there = find_element(text="Write a caption and add hashtags\u2026") is not None
+        if placeholder_still_there:
+            print(f"  [!!] Paste retry failed — caption still empty")
+            return False
+    print(f"  [caption] Pasted via clipboard ({len(text)} chars)")
+    return True
+
+
 def input_text_adb(text: str):
     """
-    Type text via ADB. Works for ASCII + basic hashtags.
-    Spaces need to be sent as %s. Problematic chars are stripped.
-    """
-    # Strip chars that break adb input text
-    safe = (text
-            .replace("\\", "")
-            .replace("'", "")
-            .replace('"', "")
-            .replace("`", "")
-            .replace("(", "")
-            .replace(")", ""))
+    Paste text into the focused field via ADB clipboard broadcast.
 
-    # ADB requires spaces as %s
-    parts = safe.split(" ")
-    first = True
-    for part in parts:
-        if not first:
-            adb(["shell", "input", "keyevent", "62"])  # KEYCODE_SPACE
-            time.sleep(0.1)
-        if part:
-            adb(["shell", "input", "text", part])
-            time.sleep(0.15)
-        first = False
+    The old approach (adb shell input text) can only handle ASCII.
+    This approach sets the Android clipboard via am broadcast and then
+    pastes with Ctrl+V (KEYCODE_PASTE). Works with Japanese, emojis,
+    and all Unicode.
+    """
+    if not text:
+        return
+
+    # Replace newlines with literal \n for the broadcast extra
+    # (Android clipboard supports newlines)
+    escaped = text.replace("'", "'\\''")  # escape single quotes for shell
+
+    # Set clipboard via ADB broadcast using clipper-style approach
+    # Write text to a temp file on device, then use am broadcast
+    # to set clipboard content.
+    import tempfile
+    tmp = tempfile.NamedTemporaryFile(mode='w', suffix='.txt', delete=False,
+                                       encoding='utf-8', dir='.')
+    try:
+        tmp.write(text)
+        tmp.close()
+        # Push text file to device
+        adb(["push", tmp.name, "/data/local/tmp/caption.txt"], timeout=10)
+        # Use input via clipboard: set clipboard and paste
+        # Method: use 'am broadcast' with ADB_INPUT_TEXT or service call
+        # Simplest reliable method: use 'input text' for ASCII parts,
+        # and for non-ASCII, use PowerShell to set Windows clipboard
+        # (BlueStacks shares clipboard with Windows host)
+    finally:
+        try:
+            os.remove(tmp.name)
+        except OSError:
+            pass
+
+    # Set Windows clipboard (shared with BlueStacks)
+    try:
+        import subprocess as _sp
+        # Write caption to a temp file for PowerShell to read
+        caption_file = os.path.join(os.path.dirname(__file__), "_caption_tmp.txt")
+        with open(caption_file, "w", encoding="utf-8") as f:
+            f.write(text)
+        _sp.run(
+            ["powershell", "-NoProfile", "-Command",
+             f"Get-Content -Path '{caption_file}' -Raw | Set-Clipboard"],
+            capture_output=True, timeout=10
+        )
+        os.remove(caption_file)
+    except Exception as e:
+        print(f"  [!!] Could not set clipboard: {e}")
+        return
+
+    time.sleep(0.5)
+
+    # Paste via Windows SendKeys — the ONLY method that preserves
+    # Japanese/Unicode in BlueStacks. Sequence: Ctrl+A (select all)
+    # → Delete → Ctrl+V (paste). This ensures a clean field.
+    ps_cmd = (
+        "Add-Type -AssemblyName System.Windows.Forms; "
+        "Add-Type -TypeDefinition 'using System; using System.Runtime.InteropServices; "
+        "public class W { [DllImport(\"user32.dll\")] public static extern bool "
+        "SetForegroundWindow(IntPtr hWnd); }'; "
+        "$p = Get-Process HD-Player -ErrorAction SilentlyContinue; "
+        "if ($p) { [W]::SetForegroundWindow($p.MainWindowHandle); "
+        "Start-Sleep -Milliseconds 300; "
+        "[System.Windows.Forms.SendKeys]::SendWait('^a'); "
+        "Start-Sleep -Milliseconds 200; "
+        "[System.Windows.Forms.SendKeys]::SendWait('{DELETE}'); "
+        "Start-Sleep -Milliseconds 200; "
+        "[System.Windows.Forms.SendKeys]::SendWait('^v') }"
+    )
+    subprocess.run(
+        ["powershell", "-NoProfile", "-Command", ps_cmd],
+        capture_output=True, timeout=10
+    )
+    time.sleep(1.0)
+    print(f"  [caption] Pasted via SendKeys ({len(text)} chars)")
 
 
 # ─── Coords management ────────────────────────────────────────────
@@ -289,32 +474,223 @@ def save_coords(coords: dict):
 
 def push_video_to_bluestacks(local_path: str) -> str:
     """
-    Push video file to BlueStacks DCIM/Camera — Instagram checks here first.
+    Push video file to BlueStacks DCIM/Camera so Instagram gallery sees it.
+    Uses two-step push (tmp → cp) because BlueStacks 5 fchown fails on
+    direct adb push to /sdcard/.
     Returns the remote path on the Android filesystem.
     """
     filename = os.path.basename(local_path)
+    tmp_path = f"/data/local/tmp/{filename}"
     remote   = f"/sdcard/DCIM/Camera/{filename}"
 
     # Ensure the folder exists
     adb(["shell", "mkdir", "-p", "/sdcard/DCIM/Camera"])
 
-    print(f"  [push] {filename} → BlueStacks...")
-    out = adb(["push", local_path, remote], timeout=120)
-    if "error" in out.lower():
+    print(f"  [push] {filename} -> BlueStacks...")
+
+    # Step 1: push to /data/local/tmp (always writable)
+    out = adb(["push", local_path, tmp_path], timeout=120)
+    if "error" in out.lower() and "fchown" not in out.lower():
         print(f"  [!!] Push failed: {out}")
         return ""
 
-    # Trigger media scanner so Instagram gallery sees the video immediately
+    # Step 2: copy from tmp to sdcard gallery
+    adb(["shell", "cp", tmp_path, remote])
+    adb(["shell", "rm", tmp_path])
+
+    # Verify the file landed. If ADB went offline mid-push, ls returns
+    # garbage or empty — attempt to recover the connection before giving up.
+    verify = adb(["shell", "ls", "-la", remote])
+    if filename not in verify:
+        # Check if ADB itself is healthy — a device-offline state
+        # turns every subsequent adb call into a silent failure.
+        dev_check = subprocess.run(
+            ["adb", "devices"], capture_output=True, text=True, timeout=10
+        ).stdout
+        if "offline" in dev_check or "127.0.0.1:5555\tdevice" not in dev_check:
+            print(f"  [!!] ADB device offline/missing — reconnecting...")
+            subprocess.run(["adb", "disconnect", "127.0.0.1:5555"],
+                           capture_output=True, timeout=10)
+            time.sleep(1)
+            subprocess.run(["adb", "connect", "127.0.0.1:5555"],
+                           capture_output=True, timeout=10)
+            time.sleep(3)
+            # Retry the push from scratch.
+            adb(["shell", "mkdir", "-p", "/sdcard/DCIM/Camera"])
+            adb(["push", local_path, tmp_path], timeout=120)
+            adb(["shell", "cp", tmp_path, remote])
+            adb(["shell", "rm", tmp_path])
+            verify = adb(["shell", "ls", "-la", remote])
+            if filename not in verify:
+                print(f"  [!!] File still not found after ADB reconnect")
+                return ""
+            print(f"  [push] Recovered after ADB reconnect")
+        else:
+            print(f"  [!!] File not found after push: {remote}")
+            return ""
+
+    # Trigger media scanner so Instagram gallery sees the video immediately.
+    # Use both broadcast + cmd content scan (cmd works on more API levels).
     adb(["shell", "am", "broadcast",
          "-a", "android.intent.action.MEDIA_SCANNER_SCAN_FILE",
          "-d", f"file://{remote}"])
+    adb(["shell", "cmd", "media", "rescan", remote])
     time.sleep(AFTER_PUSH_SLEEP)
     print(f"  [push] Done")
     return remote
 
 
+def ensure_thumbnail_on_device():
+    """Push thumbnail.jpg to BlueStacks gallery if not already there."""
+    thumb_local = os.path.join(os.path.dirname(__file__), "thumbnail.jpg")
+    if not os.path.exists(thumb_local):
+        return
+    # Check if already on device
+    check = adb(["shell", "ls", "/sdcard/DCIM/Camera/thumbnail.jpg"])
+    if "thumbnail.jpg" in check:
+        return
+    # Push via two-step
+    adb(["push", thumb_local, "/data/local/tmp/thumbnail.jpg"], timeout=30)
+    adb(["shell", "cp", "/data/local/tmp/thumbnail.jpg", "/sdcard/DCIM/Camera/thumbnail.jpg"])
+    adb(["shell", "rm", "/data/local/tmp/thumbnail.jpg"])
+    adb(["shell", "am", "broadcast",
+         "-a", "android.intent.action.MEDIA_SCANNER_SCAN_FILE",
+         "-d", "file:///sdcard/DCIM/Camera/thumbnail.jpg"])
+    time.sleep(2)
+    print("  [cover] Thumbnail pushed to BlueStacks gallery")
+
+
+def focus_bluestacks_window():
+    """Force the BlueStacks host window to the foreground.
+
+    BlueStacks pauses its renderer when the host window loses focus —
+    Android keeps running but the display freezes/goes black, which
+    makes IG's share UI silently fail (taps land but nothing draws).
+
+    Uses WScript.Shell's AppActivate in addition to SetForegroundWindow
+    because Windows' focus-stealing-prevention blocks the Win32 API from
+    non-foreground processes, but AppActivate isn't subject to that
+    restriction. Calls SW_RESTORE first to un-minimize."""
+    try:
+        ps_cmd = (
+            "Add-Type -TypeDefinition 'using System; using System.Runtime.InteropServices; "
+            "public class W { [DllImport(\"user32.dll\")] public static extern bool "
+            "SetForegroundWindow(IntPtr h); "
+            "[DllImport(\"user32.dll\")] public static extern bool ShowWindow(IntPtr h, int n); "
+            "[DllImport(\"user32.dll\")] public static extern bool BringWindowToTop(IntPtr h); }'; "
+            "$p = Get-Process HD-Player -ErrorAction SilentlyContinue; "
+            "if ($p) { "
+            "  [W]::ShowWindow($p.MainWindowHandle, 9); "
+            "  [W]::BringWindowToTop($p.MainWindowHandle); "
+            "  [W]::SetForegroundWindow($p.MainWindowHandle); "
+            "  $w = New-Object -ComObject WScript.Shell; "
+            "  $w.AppActivate('BlueStacks App Player') | Out-Null; "
+            "}"
+        )
+        subprocess.run(
+            ["powershell", "-NoProfile", "-Command", ps_cmd],
+            capture_output=True, timeout=10
+        )
+        time.sleep(1.5)
+    except Exception as e:
+        print(f"  [focus] could not foreground BlueStacks: {e}")
+
+
+def is_screen_rendering() -> bool:
+    """Check if BlueStacks' display is actually rendering (not paused).
+
+    When the renderer is paused, screencap returns a pure-black frame
+    even though Android says mAwake=true. Samples a screenshot and
+    returns False if average brightness is below 3/255.
+    """
+    try:
+        adb(["shell", "screencap", "-p", "/sdcard/_bright_check.png"], timeout=10)
+        adb(["pull", "/sdcard/_bright_check.png", "_bright_check.png"], timeout=10)
+        adb(["shell", "rm", "/sdcard/_bright_check.png"], timeout=5)
+        from PIL import Image
+        im = Image.open("_bright_check.png")
+        w, h = im.size
+        # Sample a 20x20 grid — much faster than full scan.
+        total = 0
+        count = 0
+        for y in range(0, h, max(1, h // 20)):
+            for x in range(0, w, max(1, w // 20)):
+                px = im.getpixel((x, y))
+                total += sum(px[:3])
+                count += 3
+        im.close()
+        try:
+            os.remove("_bright_check.png")
+        except OSError:
+            pass
+        avg = total / count if count else 0
+        return avg > 3
+    except Exception as e:
+        print(f"  [screen] check failed: {e}")
+        return True  # assume OK on error — don't block the flow
+
+
+def ensure_screen_rendering(max_attempts: int = 3) -> bool:
+    """Re-focus BlueStacks until the screen stops being black.
+
+    If three focus attempts don't revive rendering, restart HD-Player
+    entirely. Returns True if screen is rendering by the time we return.
+    """
+    for attempt in range(max_attempts):
+        if is_screen_rendering():
+            return True
+        print(f"  [screen] BLACK (attempt {attempt+1}/{max_attempts}) — refocusing")
+        focus_bluestacks_window()
+        time.sleep(2)
+    # Last resort: restart HD-Player
+    if not is_screen_rendering():
+        print("  [screen] still black — restarting HD-Player")
+        try:
+            subprocess.run(
+                ["powershell", "-NoProfile", "-Command",
+                 "Stop-Process -Name HD-Player -Force -ErrorAction SilentlyContinue"],
+                capture_output=True, timeout=10
+            )
+            time.sleep(3)
+            subprocess.Popen(
+                ["C:/Program Files/BlueStacks_nxt/HD-Player.exe", "--instance", "Pie64"],
+                creationflags=0x00000008  # DETACHED_PROCESS
+            )
+            # Wait for boot
+            for _ in range(40):
+                time.sleep(3)
+                out = adb(["shell", "getprop", "sys.boot_completed"], timeout=5)
+                if "1" in out:
+                    break
+            time.sleep(5)
+            connect_bluestacks()
+            return is_screen_rendering()
+        except Exception as e:
+            print(f"  [screen] HD-Player restart failed: {e}")
+            return False
+    return True
+
+
+def wake_screen():
+    """Wake the BlueStacks display + dismiss any lockscreen.
+    BlueStacks sometimes blanks the display after the inter-batch wait,
+    which makes every subsequent ShareHandlerActivity intent fail. The
+    real fix is force-foregrounding the host window (renderer pauses
+    when unfocused), but we still send wake/menu keyevents and re-assert
+    the never-sleep settings as belt-and-suspenders. All adb calls use
+    a short timeout so a stuck ADB session doesn't burn 2 minutes here."""
+    focus_bluestacks_window()
+    adb(["shell", "input", "keyevent", "224"], timeout=5)
+    time.sleep(0.3)
+    adb(["shell", "input", "keyevent", "82"], timeout=5)
+    time.sleep(0.3)
+    adb(["shell", "settings", "put", "system", "screen_off_timeout", "2147483647"], timeout=5)
+    adb(["shell", "svc", "power", "stayon", "true"], timeout=5)
+
+
 def launch_instagram():
     """Launch Instagram to home screen."""
+    wake_screen()
     print("  [app] Launching Instagram...")
     adb(["shell", "am", "start",
          "-n", "com.instagram.android/com.instagram.android.activity.MainTabActivity"])
@@ -327,6 +703,177 @@ def close_instagram():
     time.sleep(1)
 
 
+def dismiss_all_popups():
+    """
+    Keep tapping dismiss buttons until no more popups remain.
+    Handles all known Instagram popups:
+      - "New ways to reuse" -> OK
+      - "Get App" (Edits promo) -> back button
+      - "You're also sharing on Facebook" -> Got it
+      - "Trial reels" -> Close
+      - "Update on your original audio" -> Turn off and share / Share
+    """
+    for attempt in range(5):  # max 5 popup dismissals
+        pos = find_element(text="Got it")
+        if pos:
+            tap_absolute(pos[0], pos[1], "dismiss popup (Got it)")
+            human_delay(1.5)
+            continue
+
+        pos = find_element(text="Close")
+        if pos:
+            tap_absolute(pos[0], pos[1], "dismiss popup (Close)")
+            human_delay(1.5)
+            continue
+
+        pos = find_element(text="Turn off and share")
+        if pos:
+            tap_absolute(pos[0], pos[1], "Turn off and share")
+            human_delay(1.5)
+            return  # this one actually posts — we're done
+
+        pos = find_element(text="Get App")
+        if pos:
+            adb(["shell", "input", "keyevent", "4"])  # back button
+            print("  [ui] dismissed Edits promo")
+            human_delay(1.5)
+            continue
+
+        # "Rate Instagram" popup — tap "No, thanks"
+        pos = find_element(text="No, thanks")
+        if pos:
+            tap_absolute(pos[0], pos[1], "dismiss popup (No, thanks)")
+            human_delay(1.5)
+            continue
+
+        pos = find_element(text="Remind me later")
+        if pos:
+            tap_absolute(pos[0], pos[1], "dismiss popup (Remind me later)")
+            human_delay(1.5)
+            continue
+
+        # "New ways to reuse" has OK button, but only dismiss if that
+        # popup text is actually on screen (not the OK from other screens)
+        pos = find_element(text="OK")
+        if pos:
+            reuse = find_element(text="New ways to reuse")
+            if reuse:
+                tap_absolute(pos[0], pos[1], "dismiss popup (OK)")
+                human_delay(1.5)
+                continue
+
+        # No more popups found
+        break
+
+
+def get_profile_post_count() -> int | None:
+    """Navigate to the profile tab, read the post count, go back to home.
+    Returns the integer count, or None if it couldn't be read.
+
+    Always launches Instagram first — without this, the function would
+    tap (972, 1876) on whatever app happens to be foregrounded (often
+    Google Play after `close_instagram()` between posts).
+    """
+    import re as _re
+    # Force-launch IG to a known state. close_instagram + launch ensures
+    # the home feed is loaded so the bottom nav coords are valid.
+    close_instagram()
+    time.sleep(1)
+    launch_instagram()
+    time.sleep(6)
+    # Tap profile tab — center of [864,1832][1080,1920] = (972, 1876).
+    tap_absolute(972, 1876, "profile tab")
+    time.sleep(5)
+    # Tiny pull-to-refresh to force IG to re-query the server count.
+    # IG caches the post count on the profile screen — without a refresh,
+    # consecutive reads after posts return the stale count. Using a short
+    # swipe (300px) so we don't scroll the count header off-screen.
+    adb(["shell", "input", "swipe", "540", "400", "540", "700", "400"], timeout=5)
+    time.sleep(4)
+    # Dump UI and look for the posts count
+    pos_data = find_element(text="posts")
+    # The count is in a parent container with content-desc like "395posts"
+    adb(["shell", "uiautomator", "dump", "/sdcard/ui_dump.xml"])
+    time.sleep(0.5)
+    adb(["pull", "/sdcard/ui_dump.xml", "ui_dump.xml"])
+    adb(["shell", "rm", "/sdcard/ui_dump.xml"])
+    count = None
+    try:
+        import xml.etree.ElementTree as _ET
+        tree = _ET.parse("ui_dump.xml")
+        for node in tree.getroot().iter("node"):
+            cd = node.get("content-desc", "")
+            m = _re.match(r"(\d+)\s*posts?", cd)
+            if m:
+                count = int(m.group(1))
+                break
+            # Also try reading standalone number above "posts" text
+            txt = node.get("text", "").strip()
+            if txt.isdigit():
+                # Check if next sibling or nearby node says "posts"
+                # Heuristic: if y < 400 and x ~ 240-300, it's the posts count
+                bounds = node.get("bounds", "")
+                nums = _re.findall(r"\d+", bounds)
+                if len(nums) == 4 and int(nums[1]) < 400 and int(nums[0]) < 350:
+                    count = int(txt)
+                    break
+    except Exception:
+        pass
+    finally:
+        try:
+            os.remove("ui_dump.xml")
+        except OSError:
+            pass
+    # Go back to home tab — center of [0,1832][216,1920] = (108, 1876)
+    tap_absolute(108, 1876, "home tab")
+    time.sleep(2)
+    return count
+
+
+def get_media_content_id(filename: str) -> str:
+    """
+    Query the Android media store for the content:// ID of a file in
+    /sdcard/DCIM/Camera/ by filename.  Returns the ID string or "".
+    """
+    full_path = f"/sdcard/DCIM/Camera/{filename}"
+    # Try exact path match first (most reliable), then LIKE fallback.
+    queries = [
+        f"content query --uri content://media/external/video/media "
+        f"--projection _id --where \"_data='{full_path}'\"",
+        f"content query --uri content://media/external/video/media "
+        f"--projection _id --where \"_data LIKE '%{filename}'\"",
+    ]
+    for q in queries:
+        out = adb(["shell", q])
+        for line in out.splitlines():
+            if "_id=" in line:
+                try:
+                    return line.split("_id=")[1].strip()
+                except IndexError:
+                    pass
+    return ""
+
+
+def wait_for_media_id(filename: str, max_wait: int = 20) -> str:
+    """Poll for the content URI, re-triggering the media scanner each round.
+    The scanner is async; freshly pushed files often need 5-10s to be indexed."""
+    full_path = f"/sdcard/DCIM/Camera/{filename}"
+    deadline = time.time() + max_wait
+    attempt = 0
+    while time.time() < deadline:
+        media_id = get_media_content_id(filename)
+        if media_id:
+            return media_id
+        attempt += 1
+        # Re-trigger scan each iteration.
+        adb(["shell", "am", "broadcast",
+             "-a", "android.intent.action.MEDIA_SCANNER_SCAN_FILE",
+             "-d", f"file://{full_path}"])
+        adb(["shell", "cmd", "media", "rescan", full_path])
+        time.sleep(2)
+    return ""
+
+
 def post_reel(
     video_path: str,
     caption: str,
@@ -336,28 +883,70 @@ def post_reel(
     dry_run: bool = False,
 ) -> bool:
     """
-    Full flow to post one Reel via BlueStacks UI.
-    Returns True on likely success, False on failure.
-    """
-    def t(key, label=""):
-        """Tap by saved coords (fallback path)."""
-        tap(coords[key][0], coords[key][1], w, h, label or key)
+    Post one Reel via BlueStacks — STREAMLINED version.
 
-    def smart_tap(text=None, resource_id=None, content_desc=None,
-                  fallback_key=None, label=""):
-        """Try uiautomator first, fall back to saved coords."""
-        fb = coords.get(fallback_key) if fallback_key else None
-        return tap_element(
-            text=text, resource_id=resource_id, content_desc=content_desc,
-            fallback_pct=fb, w=w, h=h, label=label
-        )
+    Uses timed taps at known coordinates instead of uiautomator for
+    the main flow. uiautomator dumps are slow and hang, crashing the
+    process. The only uiautomator usage is Share-enabled polling.
+
+    Coordinates (1080x1920, calibrated 2026-04-10):
+      Next (editor):    (982, 1876)
+      Caption field:    (540, 829)
+      OK (caption):     (1018, 111)
+      Share:            (802, 1836)
+    """
+    import re as _re
 
     filename = os.path.basename(video_path)
-    print(f"\n{'─'*54}")
+    print(f"\n{'='*54}")
     print(f"  Posting: {filename}")
-    print(f"{'─'*54}")
+    print(f"{'='*54}")
 
-    # ── Step 1: Push video ────────────────────────────────────────
+    # ── Ensure BlueStacks is actually rendering ────────────────────
+    # The host window can lose focus during inter-batch waits, which
+    # puts BlueStacks into a paused state where the framebuffer is
+    # pure black. ADB taps still register but nothing draws → IG
+    # never shows the editor/share UI → every post fails silently.
+    if not ensure_screen_rendering():
+        print("  [!!] Screen is black, could not revive — aborting post")
+        return False
+
+    # ── Reject audio-only / unreadable files before doing anything ─
+    # Some files in the memes source are MP3 wrapped in .mp4 containers.
+    # They push fine but index as audio in the media store, so
+    # content://media/external/video/media queries return no id and the
+    # share intent can't find the file. Cheaper to quarantine now than
+    # burn 30+ seconds on ffmpeg + share-intent timeouts.
+    try:
+        import video_processor as _vp
+        if _vp._get_video_resolution(video_path) is None:
+            print("  [reject] No video stream — moving to rejects/")
+            reject_dir = os.path.join(os.path.dirname(VIDEO_DIR), "rejects")
+            os.makedirs(reject_dir, exist_ok=True)
+            try:
+                os.rename(video_path, os.path.join(reject_dir, filename))
+            except OSError:
+                pass
+            return False
+    except Exception as e:
+        print(f"  [~] Could not pre-check video ({e}) — continuing")
+
+    # ── Process video: burn emoji overlay on top-center ───────────
+    # Only run when overlays are enabled in config — otherwise post the raw file.
+    if getattr(config, "EMOJI_OVERLAY_ENABLED", False) or getattr(config, "WATERMARK_ENABLED", False):
+        print("  [proc] Burning emoji overlay...")
+        proc_ok = process_video(video_path, video_path)
+        if not proc_ok:
+            print("  [~] Overlay failed — posting original")
+    else:
+        print("  [proc] Overlays disabled — posting raw video")
+
+    # ── Clean device gallery (prevents stale media store entries
+    # from making IG's Share button stay disabled) ─────────────────
+    adb(["shell", "rm", "-f", "/sdcard/DCIM/Camera/*.mp4"])
+    time.sleep(1)
+
+    # ── Push video ────────────────────────────────────────────────
     remote = push_video_to_bluestacks(video_path)
     if not remote:
         return False
@@ -366,60 +955,123 @@ def post_reel(
         print("  [dry-run] Skipping UI taps")
         return True
 
-    # ── Step 2: Launch Instagram ──────────────────────────────────
+    # ── Get content URI (poll up to 20s, re-scanning each round) ──
+    media_id = wait_for_media_id(filename, max_wait=20)
+    if not media_id:
+        print("  [!!] No content URI after 20s — aborting")
+        return False
+
+    content_uri = f"content://media/external/video/media/{media_id}"
+    print(f"  [media] {content_uri}")
+
+    # ── Launch IG ─────────────────────────────────────────────────
+    close_instagram()
+    time.sleep(1)
     launch_instagram()
+    time.sleep(10)  # wait for IG to fully load
 
-    # ── Step 3: Tap "+" to open post creation ────────────────────
-    smart_tap(content_desc="New post", resource_id="feed_tab_icon_new_post",
-              fallback_key="plus_button", label="open create menu")
-    human_delay(2.0)
+    # ── Send share intent ─────────────────────────────────────────
+    print("  [app] Sending share intent...")
+    adb([
+        "shell", "am", "start",
+        "-a", "android.intent.action.SEND",
+        "-t", "video/mp4",
+        "-n", "com.instagram.android/com.instagram.share.handleractivity.ShareHandlerActivity",
+        "--eu", "android.intent.extra.STREAM", content_uri,
+    ])
+    time.sleep(12)  # wait for editor to load
 
-    # ── Step 4: Tap "REEL" tab ────────────────────────────────────
-    smart_tap(text="REEL", resource_id="clips_tab",
-              fallback_key="reel_tab", label="select Reel tab")
-    human_delay(1.5)
+    # ── Tap Next on editor ────────────────────────────────────────
+    print("  [tap] Next (982, 1876)")
+    tap_absolute(982, 1876, "Next")
+    time.sleep(8)  # wait for share/caption screen
 
-    # ── Step 5: Select most recent video (first in gallery) ───────
-    # Tap the first thumbnail in the gallery grid
-    smart_tap(resource_id="gallery_recycler_view",
-              fallback_key="first_video", label="open gallery")
-    human_delay(1.0)
-    # If gallery opened, tap first item
-    t("first_video", "select first video")
-    human_delay(2.0)
-
-    # ── Step 6: Tap Next (moves to trim/edit screen) ──────────────
-    smart_tap(text="Next", content_desc="Next",
-              fallback_key="next_button", label="Next (to edit)")
-    human_delay(2.5)
-
-    # ── Step 7: Tap Next again (skip editing, go to caption) ──────
-    smart_tap(text="Next", content_desc="Next",
-              fallback_key="next_button", label="Next (to caption)")
-    human_delay(2.0)
-
-    # ── Step 8: Add caption ───────────────────────────────────────
+    # ── Paste caption via Windows clipboard + ADB PASTE ───────────
+    # Unicode-safe (emojis work) and focus-safe (no SendKeys steal).
+    # BlueStacks auto-syncs Windows clipboard → Android clipboard.
     if caption:
-        smart_tap(text="Write a caption...", resource_id="caption",
-                  content_desc="Write a caption",
-                  fallback_key="caption_field", label="caption field")
-        human_delay(0.8)
-        input_text_adb(caption)
-        human_delay(0.5)
-        adb(["shell", "input", "keyevent", "111"])  # dismiss keyboard
-        human_delay(0.5)
+        print("  [caption] Tap caption field (540, 829)")
+        tap_absolute(540, 829, "caption field")
+        time.sleep(2.5)
+        paste_unicode_text(caption)
+        time.sleep(0.5)
+        # Tap OK / done to dismiss the caption editor and return to share
+        # screen. The OK button is in the top-right of the caption editor.
+        tap_absolute(1018, 111, "caption OK")
+        time.sleep(4)
 
-    # ── Step 9: Tap Share/Post ────────────────────────────────────
-    smart_tap(text="Share", content_desc="Share",
-              fallback_key="share_button", label="Share (post Reel)")
-    human_delay(1.0)
+    # ── Wait then tap Share ──────────────────────────────────────
+    # 12s lets IG finish committing the caption + re-enable Share. The
+    # first post after a cold IG launch was failing with 6s — Share stayed
+    # disabled. 12s is enough even for slow starts.
+    print("  [step10] Waiting 12s then tapping Share...")
+    time.sleep(12)
 
-    # ── Step 10: Wait for upload ──────────────────────────────────
-    print(f"  [*] Waiting {UPLOAD_WAIT}s for upload...")
+    # On cold/new accounts Share stays disabled for a while after upload
+    # (IG rate-limits new-account reel submissions). Poll the UI for
+    # enabled state before tapping — tapping a disabled Share does nothing.
+    def _share_enabled() -> bool:
+        try:
+            adb(["shell", "uiautomator", "dump", "/sdcard/ui_dump.xml"], timeout=15)
+            adb(["pull", "/sdcard/ui_dump.xml", "ui_dump.xml"], timeout=10)
+            with open("ui_dump.xml", "r", encoding="utf-8") as _f:
+                _xml = _f.read()
+            import re as _re_share
+            m = _re_share.search(r'content-desc="Share"[^/>]*enabled="(true|false)"', _xml)
+            if m:
+                return m.group(1) == "true"
+        except Exception:
+            pass
+        return True  # unknown → assume enabled, avoid false stall
+    waited = 0
+    while waited < 90:
+        if _share_enabled():
+            break
+        print(f"  [~] Share disabled — waiting 5s ({waited}s elapsed)")
+        time.sleep(5)
+        waited += 5
+
+    tap_absolute(802, 1836, "Share")
+    print("  [share] Tapped Share — waiting for upload...")
     time.sleep(UPLOAD_WAIT)
 
-    # ── Step 11: Close Instagram (clean state) ────────────────────
-    close_instagram()
+    # On brand-new / cold accounts IG shows an "About Reels" modal when you
+    # tap Share; on those accounts (802, 1836) lands in Cancel (bottom) and
+    # the real Share is the purple button at (540, 1748). Dismiss by
+    # tapping the modal's Share when we detect it.
+    if find_element(text="About Reels") is not None:
+        print("  [~] About Reels modal present — tapping its Share button")
+        tap_absolute(540, 1748, "Share (About Reels)")
+        time.sleep(UPLOAD_WAIT)
+
+    # ── Verify share landed (no longer on share screen) ──────────
+    # After a successful share, IG navigates back to the home feed.
+    # If Share was disabled or the upload failed, we'd still be on
+    # the share screen with "Save draft" visible. If we catch that
+    # state, retry the Share tap once — Share was probably briefly
+    # disabled when we tapped, and is enabled by now.
+    still_on_share = find_element(text="Save draft") is not None
+    if still_on_share:
+        print("  [~] Still on share screen — retrying Share tap")
+        tap_absolute(802, 1836, "Share (retry)")
+        time.sleep(UPLOAD_WAIT)
+        if find_element(text="About Reels") is not None:
+            print("  [~] About Reels modal on retry — tapping its Share")
+            tap_absolute(540, 1748, "Share (About Reels retry)")
+            time.sleep(UPLOAD_WAIT)
+        still_on_share = find_element(text="Save draft") is not None
+        if still_on_share:
+            print("  [!!] Share retry also failed")
+            return False
+    print("  [verify] Left share screen (post submitted)")
+
+    # ── Clean up remote video file ──────────────────────
+    adb(["shell", "rm", remote])
+
+    # Deliberately NOT calling close_instagram() here — the background
+    # upload continues even after the share screen disappears, and killing
+    # IG mid-upload drops the post silently. The next post's close+launch
+    # at the start of its own post_reel call will reset state.
 
     print(f"  [++] Posted: {filename}")
     return True
@@ -455,20 +1107,67 @@ def get_queue() -> list[str]:
 
 
 def pick_caption() -> str:
-    """Pick a simple caption that works with ADB text input."""
-    options = [
-        "sigma motivation",
-        "villain arc activated",
-        "wolf of wall street vibes",
-        "breaking bad energy",
-        "aura unlocked",
-        "no days off",
-        "built different",
-        "main character energy",
-        "patrick bateman mode",
-        "money moves only",
-    ]
-    return random.choice(options)
+    """Rotate through config.VIRAL_CAPTIONS — the exact trending-topic captions
+    Vince curated (Netherlands, Japan work culture, Titanic, Brain, Rome).
+
+    Uses a simple round-robin so each post gets a fresh caption from the pool.
+    Persists the index across posts via a counter file so every restart picks
+    up where the previous one left off instead of always starting at index 0.
+    """
+    pool = getattr(config, "VIRAL_CAPTIONS", None)
+    if not pool:
+        return "#viral #fyp #reels"
+    counter_file = os.path.join(os.path.dirname(__file__), ".caption_idx")
+    try:
+        with open(counter_file, "r", encoding="utf-8") as f:
+            idx = int(f.read().strip() or "0")
+    except (OSError, ValueError):
+        idx = 0
+    caption = pool[idx % len(pool)]
+    try:
+        with open(counter_file, "w", encoding="utf-8") as f:
+            f.write(str((idx + 1) % len(pool)))
+    except OSError:
+        pass
+    return caption
+
+
+def _OBSOLETE_pick_caption() -> str:
+    """Return the fixed caption used for all posts."""
+    return (
+        "#\U0001f1f8\U0001f1ea \u30ad\u30eb\u30ca\uff08\u7279\u96c6\u7b2c2\u5f3e\uff09"
+        "\u304c\u300c\u5317\u6975\u570f\u30bd\u30fc\u30e9\u30fc\u84c4\u96fb"
+        "\u30a2\u30a4\u30b9\u30ea\u30f3\u30af\u300d\u3092\u5c0e\u5165\u3057\u307e\u3057\u305f\uff01\n"
+        "\u3053\u308c\u306f1MW\u306e\u592a\u967d\u5149\u767a\u96fb\u30a2\u30ec\u30a4\u3068"
+        "2MWh\u306e\u30d0\u30c3\u30c6\u30ea\u30fc\u30b7\u30b9\u30c6\u30e0\u3092\u5229\u7528"
+        "\u3057\u3066\u3001\u30ad\u30eb\u30ca\u306b\u3042\u308b\u4e16\u754c\u6700\u5927\u306e"
+        "\u30a2\u30a4\u30b9\u30ea\u30f3\u30af\u8907\u5408\u65bd\u8a2d\u306b\u96fb\u529b\u3092"
+        "\u4f9b\u7d66\u3059\u308b\u3082\u306e\u3067\u3059\u3002\u590f\u306b\u84c4\u3048\u305f"
+        "\u592a\u967d\u30a8\u30cd\u30eb\u30ae\u30fc\u3092\u4f7f\u3063\u3066\u6975\u591c\u306e"
+        "\u671f\u9593\u306b\u6c37\u3092\u51cd\u3089\u305b\u308b\u3053\u3068\u3067\u3001"
+        "\u30b9\u30a6\u30a7\u30fc\u30c7\u30f3\u6700\u5317\u306e\u90fd\u5e02\u304c\u4e16\u754c"
+        "\u521d\u306e\u592a\u967d\u5149\u767a\u96fb\u306b\u3088\u308b\u30a6\u30a3\u30f3\u30bf\u30fc"
+        "\u30b9\u30dd\u30fc\u30c4\u306e\u62e0\u70b9\u3068\u306a\u308a\u307e\u3057\u305f\uff01"
+        "\u2600\ufe0f\U0001f50b\u26f8\ufe0f\u2744\ufe0f\u26a1\ufe0f\n"
+        "\u3053\u306e\u5b63\u7bc0\u9593\u306e\u30a8\u30cd\u30eb\u30ae\u30fc\u8caf\u8535"
+        "\u30bd\u30ea\u30e5\u30fc\u30b7\u30e7\u30f3\u306b\u3088\u308a\u3001\u6c37\u306e"
+        "\u30e1\u30f3\u30c6\u30ca\u30f3\u30b9\u304b\u3089\u30c7\u30a3\u30fc\u30bc\u30eb"
+        "\u71c3\u6599\u306e\u4f7f\u7528\u304c\u5b8c\u5168\u306b\u6392\u9664\u3055\u308c"
+        "\u307e\u3057\u305f\u3002\n"
+        "\u30ad\u30eb\u30ca\u306f\u5317\u6975\u570f\u306e\u767d\u591c\u306e\u592a\u967d"
+        "\u5149\u3092\u30a2\u30a4\u30b9\u30ea\u30f3\u30af\u306e\u30a8\u30cd\u30eb\u30ae\u30fc"
+        "\u3068\u3057\u3066\u84c4\u3048\u3001\u30b9\u30a6\u30a7\u30fc\u30c7\u30f3\u6700\u5317"
+        "\u306e\u8857\u306e\u30a2\u30a4\u30b9\u30db\u30c3\u30b1\u30fc\u5834\u3092\u6975\u591c"
+        "\u306e\u4e2d\u3067\u3082\u30af\u30ea\u30b9\u30bf\u30eb\u306e\u3088\u3046\u306b"
+        "\u7f8e\u3057\u304f\u8f1d\u304b\u305b\u3066\u3044\u307e\u3059\u3002\U0001f1f8\U0001f1ea\n"
+        "\u590f\u306e\u592a\u967d\u304c\u51ac\u306e\u6c37\u3092\u51cd\u3089\u305b\u308b"
+        " \u2014 \u30ad\u30eb\u30ca\u306f\u3001\u5b63\u7bc0\u9593\u306e\u84c4\u96fb"
+        "\u30bd\u30ea\u30e5\u30fc\u30b7\u30e7\u30f3\u304c\u5317\u6975\u570f\u306e"
+        "\u30a6\u30a3\u30f3\u30bf\u30fc\u30b9\u30dd\u30fc\u30c4\u306e\u52d5\u529b\u6e90"
+        "\u306b\u306a\u308a\u5f97\u308b\u3053\u3068\u3092\u8a3c\u660e\u3057\u3066\u3044"
+        "\u307e\u3059\uff01 \u26f8\ufe0f\U0001f49a\n"
+        "#Kiruna #Sweden #SolarStorage #IceRink ArcticEnergy WinterSports SeasonalBattery"
+    )
 
 
 # ─── Calibration mode ─────────────────────────────────────────────
@@ -480,20 +1179,20 @@ def run_calibration(w: int, h: int):
     """
     coords = load_coords()
 
-    print("""
-╔══════════════════════════════════════════════════════╗
-║         BlueStacks Calibration Mode                  ║
-║  Takes screenshots so you can find the right coords  ║
-╚══════════════════════════════════════════════════════╝
-
-This will walk you through each tap point.
-For each step:
-  1. A screenshot is saved showing the current screen
-  2. Open the screenshot to see where to tap
-  3. Enter the X,Y pixel coords (or press Enter to keep current)
-
-Screen size: {w}x{h}
-""".format(w=w, h=h))
+    print()
+    print("=" * 54)
+    print("  BlueStacks Calibration Mode")
+    print("  Takes screenshots so you can find the right coords")
+    print("=" * 54)
+    print()
+    print("This will walk you through each tap point.")
+    print("For each step:")
+    print("  1. A screenshot is saved showing the current screen")
+    print("  2. Open the screenshot to see where to tap")
+    print("  3. Enter the X,Y pixel coords (or press Enter to keep current)")
+    print()
+    print(f"Screen size: {w}x{h}")
+    print()
 
     steps = [
         ("plus_button",   "Step 1: The '+' button to create a new post (bottom nav)"),
@@ -545,19 +1244,19 @@ def main():
     parser.add_argument("--daily-cap",  type=int, default=None, help="Max posts per day")
     args = parser.parse_args()
 
-    print("""
-╔══════════════════════════════════════════════════════╗
-║     BlueStacks Instagram Poster                      ║
-║     Real app · Real taps · Undetectable              ║
-╚══════════════════════════════════════════════════════╝
-""")
+    print()
+    print("=" * 54)
+    print("  BlueStacks Instagram Poster")
+    print("  Real app - Real taps - Undetectable")
+    print("=" * 54)
+    print()
 
     # Connect ADB
     if not connect_bluestacks():
         sys.exit(1)
 
-    # Detect screen
-    w, h = get_screen_size()
+    # Ensure portrait mode and detect screen size
+    w, h = ensure_portrait()
     print(f"[+] Screen: {w}x{h}")
 
     # Test mode — verify ADB is working, take screenshot, dump UI, exit
@@ -568,16 +1267,15 @@ def main():
         print("[*] Dumping UI elements...")
         pos = find_element(text="Next")
         if pos:
-            print(f"[+] Found 'Next' button at {pos} — uiautomator working")
+            print(f"[+] Found 'Next' button at {pos} -- uiautomator working")
         else:
             print("[~] 'Next' not visible (expected if not on that screen)")
         packages = adb(["shell", "pm", "list", "packages", "com.instagram"])
         if "com.instagram.android" in packages:
             print("[+] Instagram is installed")
         else:
-            print("[!!] Instagram not found — install it inside BlueStacks")
+            print("[!!] Instagram not found -- install it inside BlueStacks")
         print("\n[+] Test complete. Check bluestacks_screen.png to see current screen.")
-        return
         return
 
     # Calibration mode
@@ -596,7 +1294,10 @@ def main():
 
     print(f"[*] Video folder: {VIDEO_DIR}")
     print(f"[*] Daily cap:    {daily_cap}")
-    print(f"[*] Interval:     {POST_INTERVAL_MIN//60}-{POST_INTERVAL_MAX//60} min between posts\n")
+    _ibf = getattr(config, "INTER_BATCH_FLOOR", 1680)
+    _ibc = getattr(config, "INTER_BATCH_CEIL",  1920)
+    print(f"[*] Batch size:   {getattr(config, 'BATCH_SIZE', 3)}")
+    print(f"[*] Interval:     {_ibf//60}-{_ibc//60} min between batches\n")
 
     while True:
         # Rest window check
@@ -629,36 +1330,101 @@ def main():
             time.sleep(600)
             continue
 
-        video_path = queue[0]
-        caption    = pick_caption()
+        # Post a batch of videos (3 per batch, ~30 min between batches)
+        batch_size = getattr(config, "BATCH_SIZE", 3)
+        intra_min  = getattr(config, "INTRA_BATCH_MIN", 20)
+        intra_max  = getattr(config, "INTRA_BATCH_MAX", 60)
+        inter_center = getattr(config, "INTER_BATCH_CENTER", 1800)
+        inter_floor  = getattr(config, "INTER_BATCH_FLOOR", 1680)
+        inter_ceil   = getattr(config, "INTER_BATCH_CEIL", 1920)
 
-        print(f"\n[{posts_today+1}/{daily_cap}] {os.path.basename(video_path)}")
-        print(f"  Caption: {caption}")
+        # Read profile post count BEFORE the batch so we can verify
+        # that IG actually shows N more posts after we're done.
+        pre_count = get_profile_post_count()
+        if pre_count is not None:
+            print(f"\n[verify] Profile shows {pre_count} posts before batch")
+        else:
+            print("\n[verify] Could not read pre-batch post count (will skip delta check)")
 
-        success = post_reel(video_path, caption, coords, w, h, dry_run=args.dry_run)
-
-        if success:
-            log_success(os.path.basename(video_path))
-            if config.DELETE_AFTER_UPLOAD and not args.dry_run:
-                try:
-                    os.remove(video_path)
-                    print(f"  [--] Deleted local file")
-                except OSError:
-                    pass
-            posts_today += 1
-
-            if args.once:
-                print("\n[*] --once flag set, exiting.")
+        batch_posted = 0
+        for i in range(batch_size):
+            queue = get_queue()
+            if not queue:
+                print("[!!] No videos in queue.")
+                print(f"     Run: python bluestacks_scraper.py --amount 50")
                 break
 
-            # Human-like interval between posts
-            delay = random.randint(POST_INTERVAL_MIN, POST_INTERVAL_MAX)
-            next_time = datetime.now().strftime("%H:%M:%S")
-            print(f"\n[*] Next post in {delay//60}m {delay%60}s")
-            time.sleep(delay)
-        else:
-            print(f"  [!!] Post failed — skipping, waiting 5 min")
-            time.sleep(300)
+            if posts_today >= daily_cap:
+                break
+
+            video_path = queue[0]
+            caption    = pick_caption() if getattr(config, "CAPTIONS_ENABLED", True) else ""
+
+            print(f"\n[{posts_today+1}/{daily_cap}] ({i+1}/{batch_size}) {os.path.basename(video_path)}")
+            if caption:
+                print(f"  Caption: {caption.encode('ascii', errors='replace').decode('ascii')[:80]}...")
+            else:
+                print(f"  Caption: (none)")
+
+            success = post_reel(video_path, caption, coords, w, h, dry_run=args.dry_run)
+
+            if success:
+                log_success(os.path.basename(video_path))
+                if config.DELETE_AFTER_UPLOAD and not args.dry_run:
+                    try:
+                        os.remove(video_path)
+                        print(f"  [--] Deleted local file")
+                    except OSError:
+                        pass
+                posts_today += 1
+                batch_posted += 1
+
+                if args.once:
+                    print("\n[*] --once flag set, exiting.")
+                    break
+
+                # Short delay between posts in same batch
+                if i < batch_size - 1:
+                    intra_delay = random.randint(intra_min, intra_max)
+                    print(f"  [batch] Next in batch in {intra_delay}s")
+                    time.sleep(intra_delay)
+            else:
+                print(f"  [!!] Post failed -- recovering")
+                close_instagram()
+                # If ADB was timing out, try to reconnect
+                if not adb_is_healthy():
+                    print("  [!!] ADB unresponsive — reconnecting...")
+                    global _adb_consecutive_timeouts
+                    _adb_consecutive_timeouts = 0
+                    connect_bluestacks()
+                    time.sleep(10)
+                else:
+                    time.sleep(60)
+
+        if args.once:
+            break
+
+        if not queue:
+            print("     Waiting 10 minutes then checking again...")
+            time.sleep(600)
+            continue
+
+        # Verify via profile post count delta — the truth source.
+        post_count = get_profile_post_count()
+        if pre_count is not None and post_count is not None:
+            delta = post_count - pre_count
+            mark = "OK" if delta >= batch_posted else "MISMATCH"
+            print(f"[verify] Profile now shows {post_count} posts ({delta:+d}) — claimed {batch_posted} — {mark}")
+            if delta < batch_posted:
+                print(f"[!!] {batch_posted - delta} post(s) failed to appear on profile despite success log")
+        elif post_count is not None:
+            print(f"[verify] Profile shows {post_count} posts (no pre-baseline)")
+
+        # Wait between batches (~30 min with jitter)
+        inter_delay = random.randint(inter_floor, inter_ceil)
+        next_time = (datetime.now() + __import__('datetime').timedelta(seconds=inter_delay)).strftime("%H:%M:%S")
+        print(f"\n[*] Batch done ({batch_posted} posted). Next batch at ~{next_time} ({inter_delay//60}m)")
+        time.sleep(inter_delay)
 
 
 if __name__ == "__main__":

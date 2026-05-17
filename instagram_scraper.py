@@ -44,36 +44,26 @@ COMPETITOR_ACCOUNTS = [
     "womenconsumer",
     "uncrustamemes",
 ]
-ACCOUNT_MIN_VIEWS   = 50_000   # lower bar — we trust these accounts
+ACCOUNT_MIN_VIEWS   = 500_000  # only pull proven viral content from competitors
 AMOUNT_PER_ACCOUNT  = 30       # reels to pull per account
 
 # ─── Hashtags for the motion niche ────────────────────────────────
-# Mix of high-volume and niche-specific tags
-MOTION_HASHTAGS = [
-    # Sigma / mindset
-    "sigma", "sigmamale", "sigmagrindset", "villainarc",
-    # Motivation / money
-    "motivation", "moneymotivation", "successmindset", "grindset",
-    "money", "hustle", "entrepreneur", "mindset",
-    # Movie/show edits — proven viral format
-    "wolfofwallstreet", "breakingbad", "peakyblinders",
-    "americanpsycho", "fightclub", "thesopranos", "joker",
-    # Broader reach
-    "luxurylifestyle", "fyp", "reels", "viral",
-    # Aura / rizz
-    "aura", "rizz", "pov",
-]
+# Disabled — relying on competitor accounts + explore page instead.
+# Hashtag scraping is noisy and pulls low-quality content.
+MOTION_HASHTAGS = []
 
 # ─── Filters ──────────────────────────────────────────────────────
-MIN_VIEWS       = 200_000    # minimum views to download
-MAX_DURATION    = 30         # seconds — short clips rewatched = explore push
+MIN_VIEWS       = 500_000    # minimum views — only proven viral content
+MAX_DURATION    = 15         # seconds — short clips rewatch more = explore push
 MIN_DURATION    = 3          # skip sub-3-second clips
+MIN_ENGAGEMENT  = 0.03       # 3% likes/views — filters "scrolled past" from "actually liked"
 AMOUNT_PER_TAG  = 15         # how many posts to check per hashtag (top + recent)
 
 # ─── Paths ────────────────────────────────────────────────────────
 DOWNLOAD_DIR    = os.path.join(os.path.dirname(__file__), "tiktok_videos", "motion")
 SEEN_LOG        = os.path.join(os.path.dirname(__file__), "ig_scraped.txt")
 CAPTION_LOG     = os.path.join(os.path.dirname(__file__), "scraped_captions.txt")
+HOT_ACCOUNTS    = os.path.join(os.path.dirname(__file__), "hot_accounts.txt")
 SESSION_FILE    = config.SESSION_FILE
 
 
@@ -96,6 +86,15 @@ def save_caption(caption: str):
         return
     with open(CAPTION_LOG, "a", encoding="utf-8") as f:
         f.write(caption.replace("\n", " ").strip() + "\n")
+
+
+def log_hot_account(username: str, views: int, likes: int):
+    """Log accounts that produce bangers — review later to add as competitors."""
+    if not username or username in [a for a in COMPETITOR_ACCOUNTS]:
+        return
+    ratio = likes / views if views else 0
+    with open(HOT_ACCOUNTS, "a", encoding="utf-8") as f:
+        f.write(f"@{username} | {views:,} views | {ratio:.1%} eng | {datetime.now().strftime('%Y-%m-%d')}\n")
 
 
 def login() -> Client:
@@ -146,18 +145,26 @@ def get_reels_for_tag(cl: Client, hashtag: str, amount: int) -> list:
 
 
 def get_explore_reels(cl: Client, amount: int = 50) -> list:
-    """Fetch Reels from the account's personalised Explore page."""
+    """Fetch Reels from the account's personalised Explore/Reels feed."""
     medias = []
     try:
-        posts = cl.explore_posts(max_amount=amount)
-        medias = [p for p in posts if is_reel(p)]
-        print(f"  Explore page — {len(medias)} reels found (from {len(posts)} posts)")
+        # explore_reels returns reels from the Reels tab / explore feed
+        reels = cl.explore_reels(amount=amount)
+        medias = [r for r in reels if is_reel(r)]
+        print(f"  Explore reels -- {len(medias)} reels found")
         time.sleep(random.uniform(2, 4))
     except (PleaseWaitFewMinutes, RateLimitError):
-        print(f"  [scraper] Rate limited on explore — sleeping 60s")
+        print(f"  [scraper] Rate limited on explore -- sleeping 60s")
         time.sleep(60)
     except Exception as e:
-        print(f"  [scraper] Explore page error: {e}")
+        print(f"  [scraper] explore_reels error: {e}")
+        # Fallback: try explore_page
+        try:
+            page = cl.explore_page(amount=amount)
+            medias = [p for p in page if is_reel(p)]
+            print(f"  Explore page -- {len(medias)} reels found")
+        except Exception as e2:
+            print(f"  [scraper] explore_page error: {e2}")
     return medias
 
 
@@ -185,7 +192,8 @@ def is_reel(media) -> bool:
     return media_type == 2 or product_type == "clips"
 
 
-def passes_filters(media, min_views: int, seen_ids: set) -> tuple[bool, str]:
+def passes_filters(media, min_views: int, seen_ids: set,
+                   skip_engagement: bool = False) -> tuple[bool, str]:
     """Returns (passes, reason_if_rejected)."""
     pk = str(media.pk)
 
@@ -196,8 +204,13 @@ def passes_filters(media, min_views: int, seen_ids: set) -> tuple[bool, str]:
         return False, "not a reel"
 
     views = getattr(media, "view_count", 0) or 0
-    if views < min_views:
+    if min_views > 0 and views < min_views:
         return False, f"views too low ({views:,})"
+
+    if not skip_engagement:
+        likes = getattr(media, "like_count", 0) or 0
+        if views > 0 and likes / views < MIN_ENGAGEMENT:
+            return False, f"low engagement ({likes/views:.1%}, need {MIN_ENGAGEMENT:.0%})"
 
     duration = getattr(media, "video_duration", 0) or 0
     if duration > MAX_DURATION:
@@ -247,12 +260,12 @@ def main():
     parser.add_argument("--hashtags-only",   action="store_true",          help="Only scrape hashtags, skip accounts")
     args = parser.parse_args()
 
-    print("""
-╔══════════════════════════════════════════════════════╗
-║     Instagram Reel Scraper — Motion Niche            ║
-║     Accounts → Hashtags → Telegram → Save            ║
-╚══════════════════════════════════════════════════════╝
-""")
+    print()
+    print("=" * 54)
+    print("  Instagram Reel Scraper - Motion Niche")
+    print("  Accounts + Explore -> Telegram -> Save")
+    print("=" * 54)
+    print()
 
     hashtags     = args.hashtags or MOTION_HASHTAGS
     target       = args.amount
@@ -274,7 +287,7 @@ def main():
     cl = login()
     print()
 
-    def process_media_list(medias, source_label, threshold):
+    def process_media_list(medias, source_label, threshold, skip_engagement=False):
         """Deduplicate, filter, and download a list of media. Returns count downloaded."""
         nonlocal downloaded, checked
         count = 0
@@ -296,15 +309,20 @@ def main():
             views = getattr(media, "view_count", 0) or 0
             dur   = getattr(media, "video_duration", 0) or 0
 
-            passes, reason = passes_filters(media, threshold, seen_ids)
+            passes, reason = passes_filters(media, threshold, seen_ids,
+                                            skip_engagement=skip_engagement)
             if not passes:
                 continue
 
             user    = getattr(getattr(media, "user", None), "username", "unknown")
+            likes   = getattr(media, "like_count", 0) or 0
             caption = getattr(media, "caption_text", "") or ""
-            print(f"    [{downloaded+1}] @{user} — {views:,} views, {dur:.0f}s")
+            eng_pct = (likes / views * 100) if views else 0
+            print(f"    [{downloaded+1}] @{user} — {views:,} views, {eng_pct:.1f}% eng, {dur:.0f}s")
             # Save caption for reuse as viral caption
             save_caption(caption)
+            # Log the account so we can find new competitors over time
+            log_hot_account(user, views, likes)
 
             if args.dry_run:
                 mark_seen(pk)
@@ -335,36 +353,41 @@ def main():
 
         return count
 
-    # ── Phase 0: Explore page (personalised — best source) ────────
+    # -- Phase 0: Explore page (personalised -- best source) --------
+    # Vince's IG algo is already curating for him, so we trust the explore
+    # feed and don't apply the 500k view threshold here. The only filter
+    # is duration (3-15s) and dedupe. First video of each reel only.
     if not args.accounts_only and not args.hashtags_only:
-        print(f"{'─'*54}")
-        print(f"  PHASE 0 — Explore page (your personalised feed)")
-        print(f"{'─'*54}")
-        explore_medias = get_explore_reels(cl, amount=80)
-        got = process_media_list(explore_medias, "explore", min_views)
+        print(f"{'='*54}")
+        print(f"  PHASE 0 -- Explore page (your personalised feed)")
+        print(f"{'='*54}")
+        explore_medias = get_explore_reels(cl, amount=150)
+        # Trust the explore algo — drop view threshold + engagement check for Phase 0.
+        got = process_media_list(explore_medias, "explore", threshold=0,
+                                 skip_engagement=True)
         if got:
-            print(f"  Explore → {got} videos downloaded\n")
+            print(f"  Explore -> {got} videos downloaded\n")
         time.sleep(random.uniform(5, 10))
 
-    # ── Phase 1: Competitor accounts (trusted, lower view bar) ─────
+    # -- Phase 1: Competitor accounts (trusted, lower view bar) -----
     if not args.hashtags_only:
-        print(f"{'─'*54}")
-        print(f"  PHASE 1 — Scraping {len(COMPETITOR_ACCOUNTS)} competitor accounts")
-        print(f"{'─'*54}")
+        print(f"{'='*54}")
+        print(f"  PHASE 1 -- Scraping {len(COMPETITOR_ACCOUNTS)} competitor accounts")
+        print(f"{'='*54}")
         for username in COMPETITOR_ACCOUNTS:
             if downloaded >= target:
                 break
             medias = get_reels_for_account(cl, username, AMOUNT_PER_ACCOUNT)
             got = process_media_list(medias, f"@{username}", ACCOUNT_MIN_VIEWS)
             if got:
-                print(f"  @{username} → {got} videos downloaded\n")
+                print(f"  @{username} -> {got} videos downloaded\n")
             time.sleep(random.uniform(5, 10))
 
-    # ── Phase 2: Hashtags (fill remaining quota) ───────────────────
+    # -- Phase 2: Hashtags (fill remaining quota) -------------------
     if not args.accounts_only and downloaded < target:
-        print(f"\n{'─'*54}")
-        print(f"  PHASE 2 — Filling remaining {target - downloaded} from hashtags")
-        print(f"{'─'*54}")
+        print(f"\n{'='*54}")
+        print(f"  PHASE 2 -- Filling remaining {target - downloaded} from hashtags")
+        print(f"{'='*54}")
         hashtags = list(hashtags)
         random.shuffle(hashtags)
 

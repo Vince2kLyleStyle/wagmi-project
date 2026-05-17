@@ -21,66 +21,23 @@ SESSION_FILE = os.path.join(SESSION_DIR, f"{USERNAME}_session.json")
 PROXY = os.getenv("IG_PROXY", "")
 
 # ─── Video Source ───────────────────────────────────────────────────
-VIDEO_DIR = os.path.join(os.path.dirname(__file__), "tiktok_videos", os.getenv("NICHE", "motion"))
+VIDEO_DIR = os.path.join(os.path.dirname(__file__), "tiktok_videos", os.getenv("NICHE", "juicy"))
 
 # ─── Posting Limits ────────────────────────────────────────────────
-DAILY_MIN = 96         # 3 posts per 30 min × 16 active hours
-DAILY_MAX = 96         # fixed — exactly 3 every 30 min
-BATCH_SIZE = 3         # 3 videos per batch
+DAILY_MIN = 48         # juicy: 3-burst every ~60 min during active window
+DAILY_MAX = 48
+BATCH_SIZE = 3         # 3 posts in a quick stutter per batch
 
 # ─── Caption ──────────────────────────────────────────────────────
-# These are VIRAL TRENDING TOPIC captions — not niche-specific.
-# The trick: broad trending topics push posts to explore, regardless of video content.
-# Rotate these so each post looks unique. Add new trending ones as you find them.
-# Pro tip: grab captions from @twinkpotato @womenconsumer posts that went viral.
+# Juicy account uses the Japan caption
+CAPTIONS_ENABLED = True
+
 VIRAL_CAPTIONS = [
     (
-        "🇳🇱 Netherlands is transforming its cities into climate-resilient hubs!\n"
-        "In Rotterdam, innovative \"water plazas\" are being built to tackle flooding "
-        "while doubling as public spaces. These smart urban designs store excess rainwater "
-        "during storms and release it slowly—reducing pressure on drainage systems. "
-        "Beyond flood control, green rooftops and urban gardens help cool the city, "
-        "improve air quality, and boost biodiversity. A powerful example of how cities "
-        "can adapt to climate change while enhancing everyday life 🌍💧🌿\n"
-        "#Netherlands #Rotterdam #ClimateAction #GreenCity #Sustainability "
-        "#UrbanDesign #EcoFuture #SmartCity #ClimateChange #GreenLiving"
-    ),
-    (
-        "🇯🇵 Japan's work culture is unlike anything in the world.\n"
-        "From 'Inemuri' — the practice of sleeping at work as a sign of dedication — "
-        "to employees who haven't taken a day off in years. "
-        "Japan ranks among the most productive nations on earth, yet burnout is at an all-time high. "
-        "Is extreme dedication admirable or dangerous? 🤔\n"
-        "#Japan #WorkCulture #Productivity #JapanLife #Tokyo #Hustle "
-        "#WorkEthic #JapaneseLifestyle #Dedication #Mindset"
-    ),
-    (
-        "🚢 The Titanic had a second ship — and almost nobody talks about it.\n"
-        "The RMS Olympic was the Titanic's sister ship, nearly identical in every way. "
-        "It sailed for 24 years without major incident. "
-        "Some historians believe the ships were secretly swapped for insurance fraud. "
-        "The Olympic was quietly scrapped in 1935. The mystery was never solved. 🧊\n"
-        "#Titanic #History #Conspiracy #RMSOlympic #HistoryFacts "
-        "#MindBlown #DidYouKnow #HistoryLovers #Mystery #Facts"
-    ),
-    (
-        "🧠 Your brain makes 35,000 decisions every single day.\n"
-        "Most of them happen without you even realizing it. "
-        "The food you choose, the route you take, the words you say — "
-        "almost all of it runs on autopilot. "
-        "The people who master their habits master their life. "
-        "Build the right systems and your brain does the rest. 💡\n"
-        "#Psychology #Mindset #Brain #Habits #SelfImprovement "
-        "#MentalHealth #Motivation #PersonalDevelopment #Success #GrowthMindset"
-    ),
-    (
-        "🏛️ Rome wasn't built in a day — but it was burned in one.\n"
-        "In 64 AD, a fire swept through Rome for six days, destroying 10 of its 14 districts. "
-        "Emperor Nero reportedly played the lyre while watching the flames. "
-        "Whether he started it or not, he used the disaster to build his golden palace. "
-        "History's most powerful lesson: chaos always creates opportunity. 🔥\n"
-        "#History #Rome #AncientRome #DidYouKnow #HistoryFacts "
-        "#Nero #RomanEmpire #Facts #HistoryLovers #MindBlown"
+        "#🇯🇵Japan is turning footsteps into electricity! "
+        "Using piezoelectric tiles, every step you take generates a small amount of energy. "
+        "Millions of steps together can power LED lights and displays in busy places like Shibuya Station. "
+        "A brilliant way to create a sustainable and smart city • turning m..."
     ),
 ]
 USE_SAME_CAPTION = True  # picks one randomly per post — add more as you find trending ones
@@ -88,13 +45,13 @@ USE_SAME_CAPTION = True  # picks one randomly per post — add more as you find 
 # ─── Emoji Overlay ───────────────────────────────────────────────
 # Renders 🥀🥀😭😂 at middle-right of every video before uploading.
 # Requires NotoColorEmoji font (sudo apt install fonts-noto-color-emoji)
-EMOJI_OVERLAY_ENABLED = True
+EMOJI_OVERLAY_ENABLED = False
 EMOJI_FONTSIZE = 75          # semi-small on a 1080p frame
 
 # ─── Watermark ───────────────────────────────────────────────────
 # Overlay text on each video before uploading
-WATERMARK_ENABLED = True
-WATERMARK_TEXT = "$MOTION"
+WATERMARK_ENABLED = False
+WATERMARK_TEXT = "@juice.ysaladtoppers"
 WATERMARK_FONTSIZE = 36
 WATERMARK_OPACITY = 0.45          # subtle — visible but not distracting
 WATERMARK_POSITION = "bottom_right"
@@ -103,9 +60,9 @@ WATERMARK_FONT = ""
 
 # ─── Rest Window ─────────────────────────────────────────────────
 # No posting during these hours (24h format). Bot sleeps and resumes after.
-REST_WINDOW_ENABLED = True
-REST_WINDOW_START = 3              # 3am
-REST_WINDOW_END = 9                # 9am — 6 hour rest covering the true dead zone
+REST_WINDOW_ENABLED = True         # overnight break 2am-8am to stretch content + look human
+REST_WINDOW_START = 2
+REST_WINDOW_END = 8
 
 # ─── Active Window ───────────────────────────────────────────────
 # Only post during these hours — peak engagement time.
@@ -130,15 +87,17 @@ PIN_COMMENTS = [
 PRUNE_INTERVAL_BATCHES = 4
 
 # ─── Timing (seconds) ──────────────────────────────────────────────
-# Between videos in a batch
+# Between videos in a batch — quick stutter: 20-60s between the 3 posts.
 INTRA_BATCH_MIN = 20
 INTRA_BATCH_MAX = 60
 
-# Between batches — 3 posts every 30 min with slight jitter
-INTER_BATCH_CENTER = 1800    # 30 min center
-INTER_BATCH_SPREAD = 90      # slight jitter: ±1.5 min std-dev
-INTER_BATCH_FLOOR = 1680     # never less than 28 min
-INTER_BATCH_CEIL  = 1920     # never more than 32 min
+# Between batches — ~60 min with jitter (55-65 min).
+# Juicy pace: 3 posts quickly, then wait ~60 min, repeat.
+# Slower than motion to stretch hand-downloaded content.
+INTER_BATCH_CENTER = 3600    # 60 min center
+INTER_BATCH_SPREAD = 180     # jitter: ±3 min std-dev
+INTER_BATCH_FLOOR  = 3300    # never less than 55 min
+INTER_BATCH_CEIL   = 3900    # never more than 65 min
 
 # ─── Throttle / Error Handling ─────────────────────────────────────
 THROTTLE_SLEEP_MIN = 1800    # 30 min
@@ -150,7 +109,7 @@ FFMPEG_PATH = "ffmpeg"
 
 # ─── Video Duration Filter ───────────────────────────────────────────
 # Auto-delete videos longer than this (seconds). 0 = no limit.
-MAX_VIDEO_DURATION = 30                # short clips rewatch better = more explore push
+MAX_VIDEO_DURATION = 15                # short clips rewatch more = explore push
 
 # ─── Video Quality Filter ────────────────────────────────────────────
 # Auto-delete videos below this resolution (height in pixels). 0 = no limit.
