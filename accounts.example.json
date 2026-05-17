@@ -1,7 +1,7 @@
 [
     {
-        "niche": "trading",
-        "username": "your_trading_ig_account",
+        "niche": "memes",
+        "username": "your_meme_ig_account",
         "password": "your_password",
         "daily_cap": 12
     },
@@ -22,5 +22,6 @@
         "username": "your_brainrot_ig_account",
         "password": "your_password",
         "daily_cap": 10
+        "daily_cap": 144
     }
 ]

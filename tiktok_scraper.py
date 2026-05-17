@@ -48,7 +48,9 @@ def save_urls(results, filepath):
         for r in results:
             timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
             views_str = f"{r['views']:,}" if r["views"] else "unknown"
-            f.write(f"{timestamp} | {r['keyword']} | {views_str} views | {r['url']}\n")
+            likes_str = f"{r.get('likes', 0):,}" if r.get("likes") else "0"
+            ratio = f"{r['likes']/r['views']*100:.1f}%" if r.get("views") and r.get("likes") else "n/a"
+            f.write(f"{timestamp} | {r['keyword']} | {views_str} views | {likes_str} likes | {ratio} eng | {r['url']}\n")
 
 
 def run_niche(niche_name, keywords, args, existing_urls):
@@ -68,6 +70,7 @@ def run_niche(niche_name, keywords, args, existing_urls):
         min_likes=args.min_likes,
         scroll_count=args.scrolls,
         headless=not args.no_headless,
+        min_engagement_ratio=args.min_engagement,
     )
 
     if not results:
@@ -87,10 +90,11 @@ def run_niche(niche_name, keywords, args, existing_urls):
 
     save_urls(new_results, args.output)
 
-    # Print results
+    # Print results — show engagement so you can see quality at a glance
     for r in new_results[:10]:  # Show first 10
         views = f"{r['views']:>10,}" if r["views"] else "   unknown"
-        print(f"  {views} views | {r['url']}")
+        ratio = f"{r['likes']/r['views']*100:.1f}%" if r.get("views") and r.get("likes") else "  n/a"
+        print(f"  {views} views | {ratio:>5} eng | {r['url']}")
     if len(new_results) > 10:
         print(f"  ... and {len(new_results) - 10} more")
 
@@ -148,6 +152,10 @@ def main():
     parser.add_argument(
         "--min-likes", type=int, default=cfg.MIN_LIKES,
         help=f"Minimum like count filter (default: {cfg.MIN_LIKES:,})"
+    )
+    parser.add_argument(
+        "--min-engagement", type=float, default=cfg.MIN_ENGAGEMENT_RATIO,
+        help=f"Min likes/views ratio (default: {cfg.MIN_ENGAGEMENT_RATIO})"
     )
     parser.add_argument(
         "--scrolls", type=int, default=cfg.SCROLL_COUNT,
