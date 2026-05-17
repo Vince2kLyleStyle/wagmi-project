@@ -26,6 +26,12 @@ NICHES = {
         "try not to laugh", "funniest video ever",
         "perfectly cut screams", "unexpected ending",
     ],
+    "brainrot": [
+        "brainrot", "skibidi", "NPC tiktok", "ohio meme",
+        "rizz", "sigma edit", "fanum tax", "gyatt",
+        "italian brainrot", "brainrot compilation", "brainrot funny",
+        "subway surfers brainrot", "minecraft brainrot",
+    ],
 }
 MAX_VIDEOS_PER_KEYWORD = 50            # Videos to collect per keyword
 MIN_VIEWS = 1_000_000                  # Minimum view count — viral only
