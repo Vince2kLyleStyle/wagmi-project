@@ -27,6 +27,7 @@ __pycache__/
 *.pyc
 *.pyo
 *.bak
+.venv/
 
 # ADB & emulator
 *.apk
