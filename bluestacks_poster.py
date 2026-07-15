@@ -1097,12 +1097,42 @@ def log_success(filename: str):
 
 
 def get_queue() -> list[str]:
-    pattern = os.path.join(VIDEO_DIR, "*.mp4")
-    videos  = sorted(glob.glob(pattern))
-    posted  = load_posted()
+    """Build the post queue enforcing the topcats content MIX:
+        50% hellokitty / 35% popgak (popcat+gak) / 15% catsother.
 
-    queue = [v for v in videos if os.path.basename(v) not in posted]
-    random.shuffle(queue)
+    Reads the three tier folders under tiktok_videos/, drops already-posted
+    files, and weighted-interleaves so the posting stream holds the ratio
+    (a tier that is behind its target share is picked next). Ratios overridable
+    via env MIX_HELLOKITTY / MIX_POPGAK / MIX_CATSOTHER.
+    """
+    posted = load_posted()
+    base = os.path.dirname(VIDEO_DIR)  # tiktok_videos/
+
+    tiers = [
+        ("hellokitty", float(os.getenv("MIX_HELLOKITTY", "0.50"))),
+        ("popgak",     float(os.getenv("MIX_POPGAK",     "0.35"))),
+        ("catsother",  float(os.getenv("MIX_CATSOTHER",  "0.15"))),
+    ]
+
+    pools, weights = {}, {}
+    for name, w in tiers:
+        d = os.path.join(base, name)
+        vids = [v for v in sorted(glob.glob(os.path.join(d, "*.mp4")))
+                if os.path.basename(v) not in posted]
+        random.shuffle(vids)
+        pools[name] = vids
+        weights[name] = max(w, 1e-6)
+
+    emitted = {name: 0 for name, _ in tiers}
+    queue, total = [], sum(len(v) for v in pools.values())
+    for _ in range(total):
+        avail = [name for name, _ in tiers if pools[name]]
+        if not avail:
+            break
+        # pick the tier most 'behind' its target share
+        pick = min(avail, key=lambda n: emitted[n] / weights[n])
+        queue.append(pools[pick].pop())
+        emitted[pick] += 1
     return queue
 
 

@@ -9,136 +9,51 @@ load_dotenv()
 
 # ─── TikTok Search ────────────────────────────────────────────────────
 KEYWORDS = [                           # Default keywords (used when no niche specified)
-    "TJR", "TJR edit", "wolf of wall street meme",
-    "sigma grindset", "hustle meme", "crypto meme",
+    "hello kitty", "cute cat meme", "popcat",
 ]
 
 # ─── Niche Presets ────────────────────────────────────────────────────
-# Each niche = a keyword group that maps to its own download folder
-# and ultimately to its own Instagram account.
-# Add new niches here — the pipeline and scraper will auto-detect them.
+# Each niche = a keyword group that maps to its own download folder.
+# CATS FOREVER — "topcats online". Brand = WHOLESOME, targeting women + teens/
+# young adults. Content MIX enforced by the poster: 50% hellokitty / 35% popgak
+# (popcat + gak) / 15% catsother.  (see PRIORITY tiers in bluestacks_poster.py)
+# Volume is biased toward hellokitty because it's consumed fastest at 50%.
 NICHES = {
-    "memes": [
-        # Proven performers — your best content
-        "TJR", "wolf of wall street edit",
-        # Broad discovery — let engagement ratio do the filtering
-        "funny meme compilation", "meme that made me cry laughing",
-        "try not to laugh", "funniest video ever",
-        "perfectly cut screams", "unexpected ending",
+    # ── 50% — Hello Kitty / Sanrio (the star; needs the most volume) ─
+    "hellokitty": [
+        "hello kitty", "hello kitty edit", "hello kitty funny",
+        "hello kitty aesthetic", "hello kitty cute", "hello kitty cosplay",
+        "hello kitty makeup", "hello kitty room", "hello kitty outfit",
+        "hello kitty nails", "hello kitty haul", "hello kitty plush",
+        "hello kitty asmr", "hello kitty diy", "sanrio", "sanrio aesthetic",
+        "kuromi", "my melody", "cinnamoroll",
+        # breadth expansion (wholesome, women-targeted) — added to lift volume
+        "hello kitty coquette", "hello kitty pink", "hello kitty decor",
+        "hello kitty cake", "hello kitty birthday", "hello kitty art",
+        "hello kitty drawing", "hello kitty wallpaper", "hello kitty collection",
+        "hello kitty grwm", "hello kitty fit", "hello kitty unboxing",
+        "hello kitty car", "hello kitty transformation", "sanrio haul",
+        "sanrio collection", "kuromi cute", "my melody cute", "cinnamoroll cute",
     ],
-    "motion": [
-        # ── Sigma / villain arc ─────────────────────────────────────
-        "sigma funny", "sigma meme", "sigma male funny tiktok",
-        "sigma shitpost", "sigma rule meme",
-        "villain arc funny", "villain arc meme",
-        "gigachad funny", "gigachad meme",
-        "hustle culture funny", "alpha male funny", "alpha male meme",
-        # ── Aura / rizz (currently massive) ────────────────────────
-        "aura meme", "aura funny", "he has aura", "aura tiktok",
-        "rizz funny", "rizz meme", "rizz lord", "unspoken rizz",
-        "looksmaxxing funny", "looksmaxxing meme",
-        # ── Grindset / self improvement comedy ─────────────────────
-        "entrepreneur funny", "entrepreneur meme",
-        "morning routine sigma", "5am club funny",
-        "gym motivation funny", "sigma gym", "gym sigma",
-        "self improvement funny", "hustle meme",
-        # ── Andrew Tate ─────────────────────────────────────────────
-        "andrew tate funny", "andrew tate meme",
-        # ── Money ───────────────────────────────────────────────────
-        "pov you rich", "pov bag secured", "pov you just got paid",
-        "broke vs rich", "broke to rich",
-        "when the bag hits", "when the check clears",
-        "rich lifestyle funny", "flexing money", "counting money",
-        "first paycheck", "drip check funny",
-        "passive income funny", "passive income meme",
-        "stock market funny", "crypto funny", "investing funny",
-        "lamborghini funny", "ferrari funny", "luxury lifestyle funny",
-        "yacht funny", "billionaire meme",
-        # ── POV — motion character POVs ────────────────────────────
-        "pov sigma", "pov villain arc", "pov you're the main character",
-        "pov breaking bad", "pov walter white", "pov patrick bateman",
-        "pov thomas shelby", "pov jordan belfort", "pov tony montana",
-        "pov joker", "pov john wick", "pov harvey specter",
-        "pov you got money", "pov rich", "pov boss",
-        # ── Bro thinks / when bro ───────────────────────────────────
-        "bro thinks hes patrick bateman", "bro thinks hes thomas shelby",
-        "bro thinks hes walter white", "bro thinks hes jordan belfort",
-        "that one friend who thinks hes sigma",
-        "when bro activates villain arc", "when the quiet kid",
-        # ── Brainrot ────────────────────────────────────────────────
-        "breaking bad brainrot", "walter white brainrot",
-        "sigma brainrot", "patrick bateman brainrot",
-        "peaky blinders brainrot", "wolf of wall street brainrot",
-        "joker brainrot", "american psycho brainrot",
-        "subway surfers breaking bad", "minecraft walter white",
-        # ── Breaking Bad / Better Call Saul ────────────────────────
-        "walter white funny", "walter white meme", "walter white edit",
-        "walter white im the one who knocks", "walter white i am the danger",
-        "walter white say my name", "walter white heisenberg",
-        "walter white pizza roof", "walter white laugh",
-        "jesse pinkman funny", "jesse pinkman meme", "jesse pinkman edit",
-        "jesse pinkman he cant keep getting away",
-        "gus fring funny", "gus fring meme", "gus fring edit",
-        "gus fring acceptable", "gus fring last walk",
-        "saul goodman funny", "saul goodman meme", "saul goodman 3d",
-        "better call saul funny", "better call saul meme",
-        "mike ehrmantraut funny", "hank schrader funny",
-        "breaking bad funny", "breaking bad meme",
-        "breaking bad funny moments", "breaking bad edit",
-        "breaking bad compilation funny", "breaking bad best moments",
-        "walter white jesse pinkman funny",
-        # ── Wolf of Wall Street ─────────────────────────────────────
-        "wolf of wall street funny", "wolf of wall street meme",
-        "wolf of wall street edit", "wolf of wall street best scenes",
-        "wolf of wall street funny moments", "wolf of wall street shitpost",
-        "jordan belfort funny", "jordan belfort meme", "jordan belfort edit",
-        "jordan belfort chest pound", "jordan belfort im not leaving",
-        "jordan belfort sell me this pen", "jordan belfort speech",
-        "jordan belfort crawling", "jordan belfort money",
-        "donnie azoff funny", "jonah hill wolf of wall street",
-        # ── American Psycho / Patrick Bateman ───────────────────────
-        "american psycho funny", "american psycho meme",
-        "patrick bateman funny", "patrick bateman walking",
-        "patrick bateman morning routine", "patrick bateman business card",
-        "patrick bateman lets see paul allens card",
-        # ── Peaky Blinders ──────────────────────────────────────────
-        "peaky blinders funny", "peaky blinders meme",
-        "thomas shelby funny", "thomas shelby walking",
-        "thomas shelby by order of the peaky blinders",
-        # ── Scarface ────────────────────────────────────────────────
-        "scarface funny", "scarface meme",
-        "tony montana say hello", "tony montana the world is yours",
-        # ── Fight Club ──────────────────────────────────────────────
-        "fight club funny", "fight club meme", "fight club edit",
-        "tyler durden funny", "tyler durden edit", "fight club brainrot",
-        # ── Joker ───────────────────────────────────────────────────
-        "joker funny", "joker meme", "joker stairs dance",
-        "joker we live in a society",
-        # ── Sopranos ────────────────────────────────────────────────
-        "sopranos funny", "sopranos meme",
-        "tony soprano funny", "tony soprano meme",
-        # ── Other motion universe ────────────────────────────────────
-        "goodfellas funny", "goodfellas meme",
-        "godfather funny", "godfather meme",
-        "suits funny", "suits meme", "harvey specter funny",
-        "narcos funny", "narcos meme",
-        "succession funny", "succession meme",
-        "ozark funny", "ozark meme",
-        "john wick funny", "john wick meme",
-        "pulp fiction funny", "django funny",
-        "the wire funny", "the wire meme",
-        "game of thrones funny", "game of thrones meme",
-        "prison break funny", "prison break meme",
-        # ── Edit formats ────────────────────────────────────────────
-        "coldest movie scene", "hardest movie scene",
-        "most badass movie scene", "movie villain edit",
-        "phonk movie edit", "movie scene phonk",
-        "edit that goes hard", "this edit goes crazy",
-        "movie out of context", "best movie meme",
+    # ── 35% — Popcat + Gak (crypto meme-cats, kept cute not degen) ──
+    "popgak": [
+        "popcat", "pop cat meme", "popcat meme", "popcat edit",
+        "popcat trend", "popcat funny", "popcat cute",
+        "popcat song", "popcat original", "pop cat", "popcat cat",
+        "gakster", "gak cat", "gakstercat", "gak meme", "gakster cat",
+        "gakster funny", "gak cat meme",
+    ],
+    # ── 15% — Other wholesome viral cats / characters ───────────────
+    "catsother": [
+        "cute cat meme", "funny cat", "silly cat", "cat vibing", "cat jam",
+        "maxwell cat", "oiia cat", "spinning cat", "banana cat",
+        "chipi chipi chapa chapa cat", "happy happy happy cat",
+        "michi cat", "nyan cat", "bingus cat", "cute cat", "kitten",
+        "cat compilation",
     ],
 }
 MAX_VIDEOS_PER_KEYWORD = 50            # Videos to collect per keyword
-MIN_VIEWS = 500_000                    # Minimum view count (500k = proven viral on TikTok)
+MIN_VIEWS = 50_000                     # lowered from 100k: hello kitty niche content is plentiful but lower-view; still a real quality floor (+ engagement-ratio filter)
 MIN_LIKES = 0                          # Minimum like count (0 = no filter)
 MIN_ENGAGEMENT_RATIO = 0.03            # Min likes/views ratio (3% = people actually cared)
 SCROLL_COUNT = 10                      # Times to scroll for more results

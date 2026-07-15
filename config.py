@@ -21,7 +21,7 @@ SESSION_FILE = os.path.join(SESSION_DIR, f"{USERNAME}_session.json")
 PROXY = os.getenv("IG_PROXY", "")
 
 # ─── Video Source ───────────────────────────────────────────────────
-VIDEO_DIR = os.path.join(os.path.dirname(__file__), "tiktok_videos", os.getenv("NICHE", "juicy"))
+VIDEO_DIR = os.path.join(os.path.dirname(__file__), "tiktok_videos", os.getenv("NICHE", "hellokitty"))
 
 # ─── Posting Limits ────────────────────────────────────────────────
 DAILY_MIN = 48         # juicy: 3-burst every ~60 min during active window
@@ -29,16 +29,16 @@ DAILY_MAX = 48
 BATCH_SIZE = 3         # 3 posts in a quick stutter per batch
 
 # ─── Caption ──────────────────────────────────────────────────────
-# Juicy account uses the Japan caption
+# ⚠️ TEMPORARY PLACEHOLDER — Nunu has NOT finalized the cats voice yet.
+# Brand = WHOLESOME, targeting a WOMEN audience. These are safe, on-brand
+# hashtag captions so nothing off-brand posts by accident. Replace once the
+# voice/caption strategy is decided.
 CAPTIONS_ENABLED = True
 
 VIRAL_CAPTIONS = [
-    (
-        "#🇯🇵Japan is turning footsteps into electricity! "
-        "Using piezoelectric tiles, every step you take generates a small amount of energy. "
-        "Millions of steps together can power LED lights and displays in busy places like Shibuya Station. "
-        "A brilliant way to create a sustainable and smart city • turning m..."
-    ),
+    "🐾🥺 #cat #cats #catsofinstagram #kitten #cute #catlover #meow #kitty #wholesome #hellokitty",
+    "the cutest thing you'll see today 🥰 #cats #kitten #catsofinstagram #cute #catlover #wholesome #kitty #meow",
+    "🥹💕 #cat #catsofinstagram #kittensofinstagram #cute #catlover #wholesome #hellokitty #meow #kitty",
 ]
 USE_SAME_CAPTION = True  # picks one randomly per post — add more as you find trending ones
 
