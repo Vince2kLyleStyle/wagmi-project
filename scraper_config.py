@@ -42,6 +42,13 @@ NICHES = {
         "popcat song", "popcat original", "pop cat", "popcat cat",
         "gakster", "gak cat", "gakstercat", "gak meme", "gakster cat",
         "gakster funny", "gak cat meme",
+        # ── fresh angles added 2026-07-15 (original 18 kw exhausted at 64 vids;
+        #    progress tracker only scrapes NEW keywords, so these top up 64→150) ──
+        "popcat mic", "popcat asmr", "popcat button", "popcat click",
+        "popcat dance", "popcat compilation", "popcat plush", "popcat loud",
+        "popcat reaction", "wide cat popcat", "popcat animation", "popcat game",
+        "gakster edit", "gakster trend", "gakster dance", "gak cat funny",
+        "gakster compilation", "gakster plush", "gak cat cute", "gakster meme",
     ],
     # ── 15% — Other wholesome viral cats / characters ───────────────
     "catsother": [
