@@ -28,9 +28,18 @@ def adb(*args, timeout=30):
     # adb's stdout as cp1252 and the uiautomator XML (box-chars / emoji in
     # content-desc) throws UnicodeDecodeError in the subprocess reader thread,
     # which killed the deleter mid-run at 512 posts. utf-8 + replace is safe.
-    return subprocess.run(["adb", "-s", SERIAL, *args],
-                          capture_output=True, text=True,
-                          encoding="utf-8", errors="replace", timeout=timeout)
+    try:
+        return subprocess.run(["adb", "-s", SERIAL, *args],
+                              capture_output=True, text=True,
+                              encoding="utf-8", errors="replace", timeout=timeout)
+    except subprocess.TimeoutExpired:
+        # adb can hang >timeout when the emulator is CPU-starved (e.g. heavy
+        # concurrent load) — this crashed the wipe at ~#87. Don't let one hung
+        # call kill the run: return an empty result so callers treat it as a
+        # failed read and recover/retry via the existing dump()/read_profile
+        # retry loops.
+        print(f"[warn] adb timed out ({timeout}s): {' '.join(args)[:50]}", flush=True)
+        return subprocess.CompletedProcess(args, returncode=-1, stdout="", stderr="")
 
 
 def tap(x, y):
