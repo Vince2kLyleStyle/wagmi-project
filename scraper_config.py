@@ -43,6 +43,37 @@ NICHES = {
         "hello kitty phone case", "hello kitty skincare", "hello kitty perfume",
         "hello kitty desk setup", "sanrio room tour", "hello kitty island adventure",
         "hello kitty cat", "kuromi aesthetic",
+        # ── BLITZ expansion 2026-07-15 (Nunu: hundreds on hundreds of HK shorts) ──
+        # full Sanrio character roster
+        "chococat", "little twin stars", "gudetama", "aggretsuko", "hello mimmy",
+        "hangyodon cute", "pompompurin cute", "keroppi cute", "pochacco cute",
+        # merch / haul / unboxing
+        "sanrio surprise", "sanrio unboxing", "hello kitty shopping", "sanrio store",
+        "hello kitty temu", "hello kitty shein", "hello kitty amazon finds",
+        "hello kitty squishmallow", "hello kitty build a bear", "hello kitty keychain",
+        # lifestyle / routines / setup
+        "hello kitty morning routine", "hello kitty night routine",
+        "hello kitty gaming setup", "hello kitty pc", "hello kitty keyboard",
+        "hello kitty stationary", "hello kitty journal", "hello kitty sticker",
+        # food
+        "hello kitty cookies", "hello kitty lunch", "hello kitty starbucks",
+        "hello kitty drink", "hello kitty mcdonalds", "hello kitty happy meal",
+        # beauty
+        "hello kitty press on", "hello kitty lip gloss", "hello kitty makeup collection",
+        # fashion
+        "hello kitty ootd", "hello kitty fit check", "hello kitty crocs",
+        "hello kitty shoes", "hello kitty jewelry", "hello kitty bag",
+        "hello kitty purse", "hello kitty accessories",
+        # decor / room / car
+        "hello kitty room makeover", "hello kitty bedroom", "hello kitty apartment",
+        "hello kitty car accessories", "hello kitty jeep",
+        # diy / craft
+        "hello kitty painting", "hello kitty perler", "hello kitty clay",
+        "hello kitty custom", "hello kitty tattoo",
+        # aesthetic / seasonal / cosplay
+        "hello kitty core", "sanrio core", "hello kitty pfp", "hello kitty halloween",
+        "hello kitty christmas", "hello kitty valentine", "hello kitty 50th",
+        "kuromi cosplay", "my melody cosplay", "sanrio cosplay",
     ],
     # ── 35% — Popcat + Gak (crypto meme-cats, kept cute not degen) ──
     "popgak": [
