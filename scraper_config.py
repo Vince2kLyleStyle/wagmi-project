@@ -34,6 +34,15 @@ NICHES = {
         "hello kitty grwm", "hello kitty fit", "hello kitty unboxing",
         "hello kitty car", "hello kitty transformation", "sanrio haul",
         "sanrio collection", "kuromi cute", "my melody cute", "cinnamoroll cute",
+        # fresh angles added 2026-07-15 (first 38 kw exhausted at 175 vids) —
+        # wider Sanrio roster + lifestyle niches, all wholesome/women-teen targeted
+        "pompompurin", "keroppi", "pochacco", "badtz maru", "hangyodon",
+        "tuxedo sam", "sanrio characters", "sanrio blind box", "sanrio plushie",
+        "hello kitty cafe", "sanrio cafe", "hello kitty boba", "hello kitty bakery",
+        "hello kitty bento", "hello kitty crochet", "hello kitty amigurumi",
+        "hello kitty phone case", "hello kitty skincare", "hello kitty perfume",
+        "hello kitty desk setup", "sanrio room tour", "hello kitty island adventure",
+        "hello kitty cat", "kuromi aesthetic",
     ],
     # ── 35% — Popcat + Gak (crypto meme-cats, kept cute not degen) ──
     "popgak": [
@@ -49,6 +58,9 @@ NICHES = {
         "popcat reaction", "wide cat popcat", "popcat animation", "popcat game",
         "gakster edit", "gakster trend", "gakster dance", "gak cat funny",
         "gakster compilation", "gakster plush", "gak cat cute", "gakster meme",
+        # round 2 (2026-07-15) — push 106→150
+        "popcat toy", "popcat remix", "popcat cover", "popcat sticker",
+        "popcat cat cute", "gak cat edit", "gakster cute", "gak cat asmr",
     ],
     # ── 15% — Other wholesome viral cats / characters ───────────────
     "catsother": [
