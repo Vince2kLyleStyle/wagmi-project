@@ -19,61 +19,33 @@ KEYWORDS = [                           # Default keywords (used when no niche sp
 # (popcat + gak) / 15% catsother.  (see PRIORITY tiers in bluestacks_poster.py)
 # Volume is biased toward hellokitty because it's consumed fastest at 50%.
 NICHES = {
-    # ── 50% — Hello Kitty / Sanrio (the star; needs the most volume) ─
+    # ── 50% — Hello Kitty / Sanrio, MEME-FIRST ─────────────────────────
+    # Nunu 2026-07-15: the page must be FUNNY / meme-adjacent to surface on
+    # reels. DROP lifestyle/haul/GRWM/skincare/decor (that's the "tough"
+    # off-brand content). Keep only meme + meme-adjacent formats. The old
+    # lifestyle keywords are already marked done in hellokitty_progress.txt
+    # so they won't re-scrape; these NEW meme keywords are what get pulled.
     "hellokitty": [
-        "hello kitty", "hello kitty edit", "hello kitty funny",
-        "hello kitty aesthetic", "hello kitty cute", "hello kitty cosplay",
-        "hello kitty makeup", "hello kitty room", "hello kitty outfit",
-        "hello kitty nails", "hello kitty haul", "hello kitty plush",
-        "hello kitty asmr", "hello kitty diy", "sanrio", "sanrio aesthetic",
-        "kuromi", "my melody", "cinnamoroll",
-        # breadth expansion (wholesome, women-targeted) — added to lift volume
-        "hello kitty coquette", "hello kitty pink", "hello kitty decor",
-        "hello kitty cake", "hello kitty birthday", "hello kitty art",
-        "hello kitty drawing", "hello kitty wallpaper", "hello kitty collection",
-        "hello kitty grwm", "hello kitty fit", "hello kitty unboxing",
-        "hello kitty car", "hello kitty transformation", "sanrio haul",
-        "sanrio collection", "kuromi cute", "my melody cute", "cinnamoroll cute",
-        # fresh angles added 2026-07-15 (first 38 kw exhausted at 175 vids) —
-        # wider Sanrio roster + lifestyle niches, all wholesome/women-teen targeted
-        "pompompurin", "keroppi", "pochacco", "badtz maru", "hangyodon",
-        "tuxedo sam", "sanrio characters", "sanrio blind box", "sanrio plushie",
-        "hello kitty cafe", "sanrio cafe", "hello kitty boba", "hello kitty bakery",
-        "hello kitty bento", "hello kitty crochet", "hello kitty amigurumi",
-        "hello kitty phone case", "hello kitty skincare", "hello kitty perfume",
-        "hello kitty desk setup", "sanrio room tour", "hello kitty island adventure",
-        "hello kitty cat", "kuromi aesthetic",
-        # ── BLITZ expansion 2026-07-15 (Nunu: hundreds on hundreds of HK shorts) ──
-        # full Sanrio character roster
-        "chococat", "little twin stars", "gudetama", "aggretsuko", "hello mimmy",
-        "hangyodon cute", "pompompurin cute", "keroppi cute", "pochacco cute",
-        # merch / haul / unboxing
-        "sanrio surprise", "sanrio unboxing", "hello kitty shopping", "sanrio store",
-        "hello kitty temu", "hello kitty shein", "hello kitty amazon finds",
-        "hello kitty squishmallow", "hello kitty build a bear", "hello kitty keychain",
-        # lifestyle / routines / setup
-        "hello kitty morning routine", "hello kitty night routine",
-        "hello kitty gaming setup", "hello kitty pc", "hello kitty keyboard",
-        "hello kitty stationary", "hello kitty journal", "hello kitty sticker",
-        # food
-        "hello kitty cookies", "hello kitty lunch", "hello kitty starbucks",
-        "hello kitty drink", "hello kitty mcdonalds", "hello kitty happy meal",
-        # beauty
-        "hello kitty press on", "hello kitty lip gloss", "hello kitty makeup collection",
-        # fashion
-        "hello kitty ootd", "hello kitty fit check", "hello kitty crocs",
-        "hello kitty shoes", "hello kitty jewelry", "hello kitty bag",
-        "hello kitty purse", "hello kitty accessories",
-        # decor / room / car
-        "hello kitty room makeover", "hello kitty bedroom", "hello kitty apartment",
-        "hello kitty car accessories", "hello kitty jeep",
-        # diy / craft
-        "hello kitty painting", "hello kitty perler", "hello kitty clay",
-        "hello kitty custom", "hello kitty tattoo",
-        # aesthetic / seasonal / cosplay
-        "hello kitty core", "sanrio core", "hello kitty pfp", "hello kitty halloween",
-        "hello kitty christmas", "hello kitty valentine", "hello kitty 50th",
-        "kuromi cosplay", "my melody cosplay", "sanrio cosplay",
+        # direct meme terms
+        "hello kitty meme", "hello kitty memes", "hello kitty funny meme",
+        "sanrio meme", "sanrio memes", "sanrio funny", "kuromi meme",
+        "kuromi funny", "my melody meme", "my melody funny", "cinnamoroll meme",
+        "cinnamoroll funny", "pompompurin meme", "keroppi meme",
+        # relatable / mood / pov / be-like meme formats
+        "hello kitty relatable", "hello kitty mood", "kuromi mood",
+        "hello kitty pov", "kuromi pov", "hello kitty be like", "sanrio be like",
+        "hello kitty me when", "kuromi me when", "hello kitty when",
+        "hello kitty reaction", "kuromi reaction",
+        # humor / cursed / slander meme culture
+        "cursed hello kitty", "hello kitty cursed", "hello kitty shitpost",
+        "hello kitty slander", "kuromi slander", "sanrio slander",
+        "hello kitty derp", "hello kitty rage", "hello kitty crying meme",
+        # funny edits / trends / audios
+        "hello kitty capcut", "hello kitty funny edit", "hello kitty trend funny",
+        "hello kitty cat meme", "hello kitty cat funny", "hello kitty comic",
+        "hello kitty joke", "hello kitty humor", "sanrio comic",
+        # core catch-alls (broad viral surface, already partly scraped)
+        "hello kitty cute funny", "hello kitty viral", "hello kitty funny",
     ],
     # ── 35% — Popcat + Gak (crypto meme-cats, kept cute not degen) ──
     "popgak": [
