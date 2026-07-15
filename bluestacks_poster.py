@@ -1137,29 +1137,29 @@ def get_queue() -> list[str]:
 
 
 def pick_caption() -> str:
-    """Rotate through config.VIRAL_CAPTIONS — the exact trending-topic captions
-    Vince curated (Netherlands, Japan work culture, Titanic, Brain, Rome).
-
-    Uses a simple round-robin so each post gets a fresh caption from the pool.
-    Persists the index across posts via a counter file so every restart picks
-    up where the previous one left off instead of always starting at index 0.
+    """topcats online caption strategy (Nunu 2026-07-15): each post caption is
+    a LONG CAT FACT led by the fact, followed by #kitty + a rotating mix of
+    cat/reach hashtags. Delegates to captions.generate_caption(), which never
+    repeats an identical caption (large fact pool + randomized hashtags).
+    Avoids posting the same fact back-to-back via a tiny state file. Falls back
+    to config.VIRAL_CAPTIONS only if the generator is unavailable.
     """
-    pool = getattr(config, "VIRAL_CAPTIONS", None)
-    if not pool:
-        return "#viral #fyp #reels"
-    counter_file = os.path.join(os.path.dirname(__file__), ".caption_idx")
+    last_file = os.path.join(os.path.dirname(__file__), ".caption_last")
     try:
-        with open(counter_file, "r", encoding="utf-8") as f:
-            idx = int(f.read().strip() or "0")
-    except (OSError, ValueError):
-        idx = 0
-    caption = pool[idx % len(pool)]
-    try:
-        with open(counter_file, "w", encoding="utf-8") as f:
-            f.write(str((idx + 1) % len(pool)))
-    except OSError:
-        pass
-    return caption
+        last = ""
+        if os.path.exists(last_file):
+            with open(last_file, "r", encoding="utf-8") as f:
+                last = f.read().strip()
+        caption = caption_gen.generate_caption()
+        # re-roll once if the fact (first line) repeats the previous post
+        if caption.split("\n", 1)[0] == last:
+            caption = caption_gen.generate_caption()
+        with open(last_file, "w", encoding="utf-8") as f:
+            f.write(caption.split("\n", 1)[0])
+        return caption
+    except Exception:  # noqa: BLE001 — never let caption gen crash a post
+        pool = getattr(config, "VIRAL_CAPTIONS", None)
+        return pool[0] if pool else "#kitty #cat #cats #catsofinstagram #reels #fyp"
 
 
 def _OBSOLETE_pick_caption() -> str:
