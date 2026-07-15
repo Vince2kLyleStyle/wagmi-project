@@ -46,6 +46,11 @@ NICHES = {
         "hello kitty joke", "hello kitty humor", "sanrio comic",
         # core catch-alls (broad viral surface, already partly scraped)
         "hello kitty cute funny", "hello kitty viral", "hello kitty funny",
+        # round 2 meme angles (2026-07-15) for post-wipe extension
+        "sanrio pov", "my melody pov", "cinnamoroll pov", "sanrio reaction",
+        "kuromi crashout", "hello kitty crashout", "kuromi vs my melody",
+        "hello kitty text meme", "kuromi text", "sanrio characters funny",
+        "hello kitty animation funny", "kuromi edit funny", "hello kitty gets",
     ],
     # ── 35% — Popcat + Gak (crypto meme-cats, kept cute not degen) ──
     "popgak": [
@@ -65,13 +70,23 @@ NICHES = {
         "popcat toy", "popcat remix", "popcat cover", "popcat sticker",
         "popcat cat cute", "gak cat edit", "gakster cute", "gak cat asmr",
     ],
-    # ── 15% — Other wholesome viral cats / characters ───────────────
+    # ── 15% — Funny / meme cats (Nunu's core model: short funny cat clips) ─
     "catsother": [
         "cute cat meme", "funny cat", "silly cat", "cat vibing", "cat jam",
         "maxwell cat", "oiia cat", "spinning cat", "banana cat",
         "chipi chipi chapa chapa cat", "happy happy happy cat",
         "michi cat", "nyan cat", "bingus cat", "cute cat", "kitten",
         "cat compilation",
+        # ── meme-format expansion 2026-07-15 (short funny clips w/ trending
+        #    sounds + funny captions — the reference-page model) ──
+        "cat meme", "cat memes", "funny cats", "funny cat videos",
+        "silly cats", "derp cat", "grumpy cat", "cat fail", "cat reaction",
+        "cat pov", "cat be like", "relatable cat", "cat mood", "cursed cat",
+        "screaming cat", "cat scream", "talking cat", "cat zoomies",
+        "polite cat", "huh cat", "coughing cat", "smiling cat cat",
+        "standing cat", "shocked cat", "confused cat", "cat drama",
+        "menace cat", "smudge cat", "keyboard cat", "cat trending sound",
+        "cat yelling", "cat staring meme", "uh oh cat", "cat crashout",
     ],
 }
 MAX_VIDEOS_PER_KEYWORD = 50            # Videos to collect per keyword
