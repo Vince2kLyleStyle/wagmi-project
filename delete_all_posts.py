@@ -219,14 +219,30 @@ def delete_open_post():
     tap(*dele)
     time.sleep(2)
 
-    xml = dump()
-    if action_blocked(xml):
-        return "blocked"
-    # confirm dialog ("Delete reel?") — the clickable Delete button
-    confirm = find(xml, text="Delete", clickable=True) or find(xml, text="Delete")
-    if confirm:
-        tap(*confirm)
-        time.sleep(4)
+    # Tap the confirm button. This account is FB-LINKED, so the dialog is
+    # "Delete from Instagram and Facebook?" with buttons "Delete from Instagram
+    # only" / "Delete from both" / "Cancel" — there is NO plain "Delete" button.
+    # The old find("Delete") matched nothing here, so deletes silently stopped
+    # at ~127 and the code phantom-counted "ok". We now tap "Delete from
+    # Instagram only" (wipe IG, leave any Facebook copies), retrying until the
+    # dialog renders; return "failed" (not "ok") if it never appears so the
+    # caller retries and the main loop's count-check stays honest.
+    confirm = None
+    for _ in range(6):
+        xml = dump()
+        if action_blocked(xml):
+            return "blocked"
+        confirm = (find(xml, text="Delete from Instagram only")
+                   or find(xml, text="Delete from both")
+                   or find(xml, text="Delete", clickable=True))  # legacy non-FB dialog
+        if confirm:
+            break
+        time.sleep(1.2)
+    if not confirm:
+        back()
+        return "failed"
+    tap(*confirm)
+    time.sleep(4)
     xml = dump()
     if action_blocked(xml):
         return "blocked"
@@ -244,18 +260,24 @@ def main():
                     help="safety: refuse to run unless this account is active")
     args = ap.parse_args()
 
-    goto_profile()
-    xml = dump()
-    handle = active_handle(xml)
-    start = post_count(xml)
+    # Robust startup read: use read_profile (retries + relaunches IG) instead
+    # of a single dump, so a transient empty dump / nested screen doesn't cause
+    # a false "account = ?" ABORT.
+    handle, start, xml = read_profile(args.expect_handle)
     print(f"[safety] active account = {handle} | posts = {start}", flush=True)
     if args.expect_handle and handle != args.expect_handle:
         print(f"[ABORT] active account '{handle}' != expected '{args.expect_handle}'. "
               f"Switch accounts first. Nothing deleted.", flush=True)
         sys.exit(2)
+    if start is None:
+        print("[ABORT] could not read profile at startup after retries. "
+              "Ensure IG is open on the profile. Nothing deleted.", flush=True)
+        sys.exit(2)
 
-    deleted = 0
+    deleted = 0            # REAL deletions, derived from the post-count drop
+    prev_cnt = start
     consecutive_blocks = 0
+    consecutive_stall = 0  # delete attempts that didn't reduce the count
     while True:
         if args.max and deleted >= args.max:
             print(f"[done] reached --max {args.max}", flush=True)
@@ -266,26 +288,45 @@ def main():
             print(f"[ABORT] active account became '{handle}' — stopping.", flush=True)
             break
         if cnt is None:
-            print("[stop] profile unreadable after 4 relaunch retries. Manual check needed.", flush=True)
+            print("[stop] profile unreadable after retries. Manual check needed.", flush=True)
             break
+
+        # Ground-truth progress: trust the post count, not delete_open_post's
+        # return. If the count dropped since last loop, that many posts really
+        # went; if it didn't drop after an attempt, the last delete was a no-op.
+        if prev_cnt is not None:
+            if cnt < prev_cnt:
+                deleted += (prev_cnt - cnt)
+                consecutive_stall = 0
+                print(f"[del] {cnt} posts left  (deleted {deleted} this run)", flush=True)
+            elif cnt >= prev_cnt and deleted + consecutive_stall > 0:
+                consecutive_stall += 1
+                print(f"[warn] last delete was a no-op (count still {cnt}); "
+                      f"stall {consecutive_stall}", flush=True)
+        prev_cnt = cnt
+
         if cnt == 0:
             print("[done] 0 posts remaining — profile cleared.", flush=True)
             break
+
+        if consecutive_stall >= 4:
+            print(f"[recover] {consecutive_stall} no-op deletes in a row — relaunching IG",
+                  flush=True)
+            relaunch_ig()
+            consecutive_stall = 0
+            continue
+
         if not open_first_post(xml):
             print(f"[recover] no grid post found (count={cnt}) — relaunching IG and retrying.", flush=True)
             relaunch_ig()
             continue
 
         status = delete_open_post()
-        if status == "ok":
-            deleted += 1
-            consecutive_blocks = 0
-            print(f"[del] #{deleted}  (~{(start - deleted) if start else '?'} left)", flush=True)
-        elif status == "blocked":
+        if status == "blocked":
             consecutive_blocks += 1
             if consecutive_blocks >= 3:
                 print("[STOP] blocked 3x in a row — Instagram is hard-limiting. "
-                      "Stopping so we don't risk the account. Re-run tomorrow; it resumes.", flush=True)
+                      "Stopping so we don't risk the account. Re-run later; it resumes.", flush=True)
                 break
             mins = args.block_backoff / 60
             print(f"[BLOCKED] action-block #{consecutive_blocks}. Backing off {mins:.0f} min "
@@ -293,9 +334,12 @@ def main():
             back(); time.sleep(2)
             time.sleep(args.block_backoff)
             continue
-        else:
-            print(f"[warn] delete flow returned '{status}' — going back and retrying.", flush=True)
-            back(); time.sleep(2); back(); time.sleep(2)
+        consecutive_blocks = 0
+        if status != "ok":
+            # 'failed'/'no_options'/'no_delete_item' — no confirmed delete;
+            # the count check next loop will catch it. Recover the UI and retry.
+            print(f"[warn] delete attempt returned '{status}' — recovering.", flush=True)
+            back(); time.sleep(2)
             continue
 
         delay = random.uniform(args.min_delay, args.max_delay)
