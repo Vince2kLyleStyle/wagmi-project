@@ -24,12 +24,15 @@ PROXY = os.getenv("IG_PROXY", "")
 VIDEO_DIR = os.path.join(os.path.dirname(__file__), "tiktok_videos", os.getenv("NICHE", "hellokitty"))
 
 # ─── Posting Limits ────────────────────────────────────────────────
-# topcats (Nunu 2026-07-16): 3 posts every 30 min = ~6/hr. With the 2-8am
-# rest window that's ~18 active hours -> ~108/day, so the cap is set to
-# match the cadence rather than cut it off mid-day.
-DAILY_MIN = 108
-DAILY_MAX = 108
-BATCH_SIZE = 3         # 3 posts per batch, one batch every ~30 min
+# topcats (Nunu 2026-07-16): "I only truly need 50 ish a day, we can take
+# hour breaks here and there." So: 3-post batches roughly hourly, with a
+# jittered ~50/day ceiling. 18 active hours of hourly batches is ~54
+# potential posts, so the cap lands first and the day ends with a natural
+# break rather than a hard cut mid-stream. ~50/day also stretches the
+# 348-clip bank to ~7 days instead of ~3.
+DAILY_MIN = 48
+DAILY_MAX = 52
+BATCH_SIZE = 3         # 3 posts per batch, one batch every ~hour
 
 # ─── Caption ──────────────────────────────────────────────────────
 # ⚠️ TEMPORARY PLACEHOLDER — Nunu has NOT finalized the cats voice yet.
@@ -95,11 +98,13 @@ INTRA_BATCH_MIN = 20
 INTRA_BATCH_MAX = 60
 
 # Between batches — ~60 min with jitter (55-65 min).
-# topcats pace: 3 posts quickly, then wait ~30 min, repeat (~6/hr).
-INTER_BATCH_CENTER = 1800    # 30 min center
-INTER_BATCH_SPREAD = 180     # jitter: ±3 min std-dev
-INTER_BATCH_FLOOR  = 1500    # never less than 25 min
-INTER_BATCH_CEIL   = 2100    # never more than 35 min
+# topcats pace: 3 posts quickly, then wait ~an hour, repeat. Wide jitter
+# (50-70 min) so the gaps look human rather than metronomic — Nunu is fine
+# with breaks landing here and there.
+INTER_BATCH_CENTER = 3600    # 60 min center
+INTER_BATCH_SPREAD = 300     # jitter: ±5 min std-dev
+INTER_BATCH_FLOOR  = 3000    # never less than 50 min
+INTER_BATCH_CEIL   = 4200    # never more than 70 min
 
 # ─── Throttle / Error Handling ─────────────────────────────────────
 THROTTLE_SLEEP_MIN = 1800    # 30 min
@@ -121,6 +126,7 @@ MIN_VIDEO_HEIGHT = 0
 SUCCESS_LOG = os.path.join(os.path.dirname(__file__), "success.txt")
 # Keep the local file after posting. get_queue() already dedupes against
 # SUCCESS_LOG, so deletion was never needed to avoid reposting — it only
-# destroyed the bank. Nunu's plan is to recycle posts that get no traction,
-# which is impossible if the source file is gone.
+# destroyed the bank irreversibly. Nothing is ever re-posted (Nunu 2026-07-16:
+# "we cannot afford to post a recycled clip at all"), so the kept files are
+# purely an audit trail of what went out.
 DELETE_AFTER_UPLOAD = False
