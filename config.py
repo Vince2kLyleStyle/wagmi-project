@@ -119,4 +119,8 @@ MIN_VIDEO_HEIGHT = 0
 
 # ─── Logging ────────────────────────────────────────────────────────
 SUCCESS_LOG = os.path.join(os.path.dirname(__file__), "success.txt")
-DELETE_AFTER_UPLOAD = True
+# Keep the local file after posting. get_queue() already dedupes against
+# SUCCESS_LOG, so deletion was never needed to avoid reposting — it only
+# destroyed the bank. Nunu's plan is to recycle posts that get no traction,
+# which is impossible if the source file is gone.
+DELETE_AFTER_UPLOAD = False
