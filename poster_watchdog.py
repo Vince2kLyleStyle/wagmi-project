@@ -145,10 +145,9 @@ def launch_poster(handle):
     return p
 
 
-def last_post_age_mins():
-    """Minutes since the poster last reported a successful post, read from
-    SUCCESS_LOG (the honest record — it's only written on a real post).
-    Returns None if nothing has ever posted."""
+def last_post_dt():
+    """When the poster last reported a real post, read from SUCCESS_LOG (the
+    honest record — only written on an actual post). None if never."""
     path = os.path.join(HERE, "success.txt")
     if not os.path.exists(path):
         return None
@@ -164,10 +163,36 @@ def last_post_age_mins():
     if not last:
         return None
     try:
-        dt = datetime.strptime(last, "%Y-%m-%d %H:%M:%S")
+        return datetime.strptime(last, "%Y-%m-%d %H:%M:%S")
     except ValueError:
         return None
-    return (datetime.now() - dt).total_seconds() / 60.0
+
+
+def silence_baseline(watchdog_start, last_relaunch):
+    """The most recent moment from which silence actually means something.
+
+    Silence is only evidence of a stall if the poster was SUPPOSED to be
+    posting through it. Three things legitimately reset that clock:
+
+      * the rest window ending — the 6h overnight gap is by design, and
+        measuring from the last post makes the poster look 379 min stalled
+        the instant it wakes at 08:00 (this false-fired on 2026-07-17 and
+        would have killed the poster every 2 min, forever, since a freshly
+        relaunched poster has not posted yet either)
+      * the watchdog starting — it inherits whatever gap preceded it
+      * a relaunch — the new poster needs time to produce its first post
+
+    So take the latest of those and the last real post.
+    """
+    now = datetime.now()
+    candidates = [watchdog_start, last_relaunch]
+    rest_end_today = now.replace(hour=REST_END, minute=0, second=0, microsecond=0)
+    if rest_end_today <= now:
+        candidates.append(rest_end_today)
+    lp = last_post_dt()
+    if lp:
+        candidates.append(lp)
+    return max(candidates)
 
 
 def in_rest_window():
@@ -191,11 +216,15 @@ def main():
                     help="account the poster is guarded to")
     args = ap.parse_args()
 
+    watchdog_start = datetime.now()
+    last_relaunch = watchdog_start
+
     wlog(f"watchdog up — guarding poster on '{args.handle}' "
          f"(stall threshold {STALL_MINS}m, rest {REST_START}-{REST_END})")
 
     if not poster_pids():
         launch_poster(args.handle)
+        last_relaunch = datetime.now()
 
     while True:
         time.sleep(CHECK_EVERY)
@@ -212,17 +241,22 @@ def main():
             if not input_responsive():
                 restart_bluestacks()
             launch_poster(args.handle)
+            last_relaunch = datetime.now()
             continue
 
         if in_rest_window():
             continue  # silence is expected here
 
-        age = last_post_age_mins()
-        if age is None or age < STALL_MINS:
+        age = (datetime.now()
+               - silence_baseline(watchdog_start, last_relaunch)
+               ).total_seconds() / 60.0
+        if age < STALL_MINS:
             continue
 
-        # Alive, outside rest, but nothing posted for a long time.
-        wlog(f"STALL suspected: no post for {age:.0f}m (threshold {STALL_MINS}m)")
+        # Alive, outside rest, and genuinely silent since the last moment it
+        # should have been posting.
+        wlog(f"STALL suspected: nothing posted for {age:.0f}m since the poster "
+             f"was last expected to be working (threshold {STALL_MINS}m)")
         if input_responsive():
             wlog("BlueStacks responds — poster is stuck without a freeze; "
                  "restarting the poster only")
@@ -232,6 +266,7 @@ def main():
             wlog("BlueStacks not responding to input — frozen")
             if restart_bluestacks():
                 launch_poster(args.handle)
+        last_relaunch = datetime.now()
 
 
 if __name__ == "__main__":
