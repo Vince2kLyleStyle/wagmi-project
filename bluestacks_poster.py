@@ -1500,7 +1500,11 @@ def main():
 
             if success:
                 consecutive_blocks = 0
-                log_success(os.path.basename(video_path))
+                # A dry-run returns True without publishing anything. Logging
+                # it would mark the video posted forever and silently drop it
+                # from the bank, so only record real posts.
+                if not args.dry_run:
+                    log_success(os.path.basename(video_path))
                 if config.DELETE_AFTER_UPLOAD and not args.dry_run:
                     try:
                         os.remove(video_path)
