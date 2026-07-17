@@ -766,6 +766,59 @@ def dismiss_all_popups():
         break
 
 
+def read_active_handle(max_attempts: int = 3) -> str | None:
+    """Navigate to the profile tab and read the handle from the action bar.
+    Returns the handle, or None if it couldn't be read after retries.
+    """
+    import xml.etree.ElementTree as _ET
+    for attempt in range(max_attempts):
+        close_instagram()
+        time.sleep(1)
+        launch_instagram()
+        time.sleep(6)
+        tap_absolute(972, 1876, "profile tab")
+        time.sleep(5)
+        adb(["shell", "uiautomator", "dump", "/sdcard/handle_dump.xml"])
+        time.sleep(0.5)
+        adb(["pull", "/sdcard/handle_dump.xml", "handle_dump.xml"])
+        adb(["shell", "rm", "/sdcard/handle_dump.xml"])
+        try:
+            tree = _ET.parse("handle_dump.xml")
+            for node in tree.getroot().iter("node"):
+                if node.get("resource-id", "").endswith("action_bar_title"):
+                    handle = (node.get("text") or "").strip()
+                    if handle:
+                        return handle
+        except Exception:
+            pass
+        finally:
+            try:
+                os.remove("handle_dump.xml")
+            except OSError:
+                pass
+        print(f"  [guard] handle unreadable (attempt {attempt+1}/{max_attempts})")
+    return None
+
+
+def verify_account(expect_handle: str):
+    """Abort unless the account active in BlueStacks is the expected one.
+
+    Several IG accounts are logged into this emulator, including a personal
+    one. Posting is irreversible and public, so an unreadable handle is
+    treated as a failure, never as permission to proceed.
+    """
+    handle = read_active_handle()
+    if handle is None:
+        print(f"[ABORT] Could not read the active account handle. "
+              f"Refusing to post blind.")
+        sys.exit(1)
+    if handle.lower() != expect_handle.lower():
+        print(f"[ABORT] Active account is '{handle}', expected "
+              f"'{expect_handle}'. Refusing to post to the wrong account.")
+        sys.exit(1)
+    print(f"[guard] Active account verified: {handle}")
+
+
 def get_profile_post_count() -> int | None:
     """Navigate to the profile tab, read the post count, go back to home.
     Returns the integer count, or None if it couldn't be read.
@@ -1272,6 +1325,8 @@ def main():
     parser.add_argument("--once",       action="store_true", help="Post one video and exit")
     parser.add_argument("--dry-run",    action="store_true", help="Push video but skip UI taps")
     parser.add_argument("--daily-cap",  type=int, default=None, help="Max posts per day")
+    parser.add_argument("--expect-handle", default="topcats.online",
+                        help="Abort unless this IG account is active in BlueStacks")
     args = parser.parse_args()
 
     print()
@@ -1328,6 +1383,9 @@ def main():
     _ibc = getattr(config, "INTER_BATCH_CEIL",  1920)
     print(f"[*] Batch size:   {getattr(config, 'BATCH_SIZE', 3)}")
     print(f"[*] Interval:     {_ibf//60}-{_ibc//60} min between batches\n")
+
+    # Confirm we're driving the right account before anything gets published.
+    verify_account(args.expect_handle)
 
     while True:
         # Rest window check
