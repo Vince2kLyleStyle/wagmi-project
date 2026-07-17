@@ -766,6 +766,33 @@ def dismiss_all_popups():
         break
 
 
+def action_blocked() -> bool:
+    """True if Instagram is currently showing a rate-limit / block notice.
+
+    The deleter has had this since the wipe; the poster never did, so a
+    throttled account would just keep getting hammered. At ~6 posts/hr that
+    is the difference between a temporary block and a dead account.
+    """
+    try:
+        adb(["shell", "uiautomator", "dump", "/sdcard/block_dump.xml"], timeout=15)
+        adb(["pull", "/sdcard/block_dump.xml", "block_dump.xml"], timeout=10)
+        adb(["shell", "rm", "/sdcard/block_dump.xml"], timeout=10)
+        with open("block_dump.xml", "r", encoding="utf-8", errors="replace") as f:
+            low = f.read().lower()
+    except Exception:
+        return False
+    finally:
+        try:
+            os.remove("block_dump.xml")
+        except OSError:
+            pass
+    return any(s in low for s in (
+        "action blocked", "try again later", "we restrict",
+        "temporarily blocked", "we limit how often",
+        "couldn't post", "couldn't share",
+    ))
+
+
 def read_active_handle(max_attempts: int = 3) -> str | None:
     """Navigate to the profile tab and read the handle from the action bar.
     Returns the handle, or None if it couldn't be read after retries.
@@ -1387,6 +1414,8 @@ def main():
     # Confirm we're driving the right account before anything gets published.
     verify_account(args.expect_handle)
 
+    consecutive_blocks = 0
+
     while True:
         # Rest window check
         hour = datetime.now().hour
@@ -1456,7 +1485,21 @@ def main():
 
             success = post_reel(video_path, caption, coords, w, h, dry_run=args.dry_run)
 
+            if not success and not args.dry_run and action_blocked():
+                consecutive_blocks += 1
+                backoff = min(3600 * consecutive_blocks, 6 * 3600)
+                print(f"\n[BLOCK] Instagram is rate-limiting us "
+                      f"(strike {consecutive_blocks}). Backing off "
+                      f"{backoff//60} min instead of retrying.")
+                if consecutive_blocks >= 3:
+                    print("[BLOCK] 3 consecutive blocks — stopping. "
+                          "Posting more now risks the account.")
+                    sys.exit(1)
+                time.sleep(backoff)
+                break
+
             if success:
+                consecutive_blocks = 0
                 log_success(os.path.basename(video_path))
                 if config.DELETE_AFTER_UPLOAD and not args.dry_run:
                     try:

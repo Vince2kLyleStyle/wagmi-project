@@ -24,9 +24,12 @@ PROXY = os.getenv("IG_PROXY", "")
 VIDEO_DIR = os.path.join(os.path.dirname(__file__), "tiktok_videos", os.getenv("NICHE", "hellokitty"))
 
 # ─── Posting Limits ────────────────────────────────────────────────
-DAILY_MIN = 48         # juicy: 3-burst every ~60 min during active window
-DAILY_MAX = 48
-BATCH_SIZE = 3         # 3 posts in a quick stutter per batch
+# topcats (Nunu 2026-07-16): 3 posts every 30 min = ~6/hr. With the 2-8am
+# rest window that's ~18 active hours -> ~108/day, so the cap is set to
+# match the cadence rather than cut it off mid-day.
+DAILY_MIN = 108
+DAILY_MAX = 108
+BATCH_SIZE = 3         # 3 posts per batch, one batch every ~30 min
 
 # ─── Caption ──────────────────────────────────────────────────────
 # ⚠️ TEMPORARY PLACEHOLDER — Nunu has NOT finalized the cats voice yet.
@@ -92,12 +95,11 @@ INTRA_BATCH_MIN = 20
 INTRA_BATCH_MAX = 60
 
 # Between batches — ~60 min with jitter (55-65 min).
-# Juicy pace: 3 posts quickly, then wait ~60 min, repeat.
-# Slower than motion to stretch hand-downloaded content.
-INTER_BATCH_CENTER = 3600    # 60 min center
+# topcats pace: 3 posts quickly, then wait ~30 min, repeat (~6/hr).
+INTER_BATCH_CENTER = 1800    # 30 min center
 INTER_BATCH_SPREAD = 180     # jitter: ±3 min std-dev
-INTER_BATCH_FLOOR  = 3300    # never less than 55 min
-INTER_BATCH_CEIL   = 3900    # never more than 65 min
+INTER_BATCH_FLOOR  = 1500    # never less than 25 min
+INTER_BATCH_CEIL   = 2100    # never more than 35 min
 
 # ─── Throttle / Error Handling ─────────────────────────────────────
 THROTTLE_SLEEP_MIN = 1800    # 30 min
