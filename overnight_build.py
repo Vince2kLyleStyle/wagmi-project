@@ -23,7 +23,12 @@ TARGETS = {"hellokitty": 220, "popgak": 150, "catsother": 70}
 PERMAX = {"hellokitty": 15, "popgak": 15, "catsother": 10}
 ORDER = ["hellokitty", "popgak", "catsother"]
 
-TIME_BUDGET_S = 6 * 3600        # stop after ~6h regardless
+# Stop after this long regardless. Overridable via BUILD_BUDGET_S because
+# sourcing now has to fit inside the poster's 2-8am rest window — the window
+# is safe to scrape in (the poster makes no adb calls while resting, so
+# Chromium can't starve the emulator), but the run MUST end before posting
+# resumes at 8am, with time to spare for the talking-head filter.
+TIME_BUDGET_S = int(os.getenv("BUILD_BUDGET_S", str(6 * 3600)))
 PASS_TIMEOUT_S = 45 * 60        # per niche-pass hard timeout
 MAX_ROUNDS = 10
 
